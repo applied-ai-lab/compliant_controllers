@@ -118,7 +118,7 @@ namespace compliant_controllers {
   }
 
   Eigen::VectorXd JointSpaceCompliantController::computeEffort(RobotState const& desired_state,
-      RobotState const&  current_state, ros::Duration const& period) {
+      RobotState const&  current_state, ros::Duration const& period) {    
     desired_positions_ = desired_state.positions;
 
     if (!extended_joints_->isInitialized()) {
@@ -127,13 +127,7 @@ namespace compliant_controllers {
       extended_joints_->update(current_state.positions);
       nominal_theta_prev_ = extended_joints_->getPositions();
       nominal_theta_dot_prev_ = current_state.velocities;
-      desired_positions_ = extended_joints_->getPositions();
-    }
-
-    // TODO: Does this make sense without tolerances?
-    if (desired_positions_ != last_desired_positions_ && current_state.positions != desired_positions_) {
-      last_desired_positions_ = desired_positions_;
-      desired_positions_ = extended_joints_->getPositions();
+      desired_positions_ = nominal_theta_prev_;
     }
 
     extended_joints_->update(current_state.positions);
@@ -143,26 +137,27 @@ namespace compliant_controllers {
     desired_theta_ = desired_positions_ + joint_stiffness_matrix_.inverse()*gravity_;
     desired_theta_dot_ = desired_state.velocities;
 
-    task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_theta_) - joint_d_matrix_*(nominal_theta_prev_ - desired_theta_dot_);
+    task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_theta_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_theta_dot_);
 
-    double const step_time {period.toSec()};
+    double const step_time {0.001};
 
     nominal_theta_d_dot_ = rotor_inertia_matrix_.inverse()*(task_effort_ + gravity_ + current_state.efforts);
     nominal_theta_dot_ = nominal_theta_dot_prev_ + nominal_theta_d_dot_*step_time;
     nominal_theta_ = nominal_theta_prev_ + nominal_theta_dot_*step_time;
 
-    nominal_theta_prev_ = nominal_theta_;
-    nominal_theta_dot_prev_ = nominal_theta_dot_;
-
-    nominal_friction_ = rotor_inertia_matrix_*friction_l_*((nominal_theta_dot_prev_ - current_state.velocities) + friction_lp_*(nominal_theta_prev_ - current_theta_));
+    nominal_friction_ = rotor_inertia_matrix_*friction_l_*((nominal_theta_dot_ - current_state.velocities) + friction_lp_*(nominal_theta_ - current_theta_));
 
     efforts_ = task_effort_ + nominal_friction_;
+
+    nominal_theta_prev_ = nominal_theta_;
+    nominal_theta_dot_prev_ = nominal_theta_dot_;
 
     // TODO: We will be falling for 50 iterations before we generate any effort, won't we?
     if (count_ < 50) {
       efforts_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
       ++count_;
     }
+
     return efforts_;
   }
 

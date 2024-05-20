@@ -35,7 +35,8 @@ Choose the corresponding controller manager, select the desired joint trajectory
 
 #### Known issues
 
-The simulation currently does not seem to work correctly (neither does it for the original code). This seems to be related to general problems simulating effort interfaces in Gazebo. Furthermore the code currently requires modifications to ROS control to run. A template argument has to be added to the `JointTrajectoryController` with the default value `HardwareInterfaceAdapter` to the `JointTrajectoryController`: `template <class SegmentImpl, class HardwareInterface, template <class HW, class S> class Adapter = HardwareInterfaceAdapter> class JointTrajectoryController` (see [here](https://github.com/ros-controls/ros_controllers/blob/678b92adfd9242c93b78c066a8369c7665ea1421/joint_trajectory_controller/include/joint_trajectory_controller/joint_trajectory_controller.h#L178)) .
+- The simulation currently does not seem to work correctly (neither does it for the original code). This seems to be related to general problems simulating effort interfaces in Gazebo.
+- Furthermore the code currently requires modifications to ROS control to run. A template argument has to be added to the `JointTrajectoryController` with the default value `HardwareInterfaceAdapter` to the `JointTrajectoryController`: `template <class SegmentImpl, class HardwareInterface, template <class HW, class S> class Adapter = HardwareInterfaceAdapter> class JointTrajectoryController` (see [here](https://github.com/ros-controls/ros_controllers/blob/678b92adfd9242c93b78c066a8369c7665ea1421/joint_trajectory_controller/include/joint_trajectory_controller/joint_trajectory_controller.h#L178)) .
 
 
 

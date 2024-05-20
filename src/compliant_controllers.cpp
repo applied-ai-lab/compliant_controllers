@@ -25,6 +25,28 @@
 #include "compliant_controllers/hardware_interface_adapter.h"
 
 
+// Convenient alias
+using TrajectoryState = joint_trajectory_controller::JointTrajectorySegment<
+    trajectory_interface::QuinticSplineSegment<double>
+  >::State;
+/**\class HardwareInterfaceAdapter
+ * \brief
+ *   This specialization is more specific than the previous specialization
+ *   template <typename State> HardwareInterfaceAdapter<hardware_interface::EffortJointInterface,State>
+*/
+template <>
+class HardwareInterfaceAdapter<hardware_interface::EffortJointInterface,TrajectoryState>: public
+      compliant_controllers::CompliantHardwareInterfaceAdapter<
+        hardware_interface::EffortJointInterface,TrajectoryState
+      > {
+  public:
+    HardwareInterfaceAdapter() = default;
+    HardwareInterfaceAdapter(HardwareInterfaceAdapter const&) = default;
+    HardwareInterfaceAdapter& operator= (HardwareInterfaceAdapter const&) = default;
+    HardwareInterfaceAdapter(HardwareInterfaceAdapter&&) = default;
+    HardwareInterfaceAdapter& operator= (HardwareInterfaceAdapter&&) = default;
+};
+
 namespace compliant_controllers {
 
   /**\class JointTrajectoryController
@@ -34,8 +56,7 @@ namespace compliant_controllers {
   class JointTrajectoryController: public
     joint_trajectory_controller::JointTrajectoryController<
       trajectory_interface::QuinticSplineSegment<double>,
-      hardware_interface::EffortJointInterface,
-      compliant_controllers::CompliantHardwareInterfaceAdapter
+      hardware_interface::EffortJointInterface
     > {
     public:
       JointTrajectoryController() = default;

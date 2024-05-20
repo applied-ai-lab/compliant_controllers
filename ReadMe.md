@@ -35,15 +35,14 @@ Choose the corresponding controller manager, select the desired joint trajectory
 
 #### Known issues
 
+The following issues should be noted by the users of this package:
+
 - The simulation currently does not seem to work correctly (neither does it for the original code). This seems to be related to general problems simulating effort interfaces in Gazebo.
 - Furthermore the code currently requires modifications to ROS control to run. A template argument has to be added to the `JointTrajectoryController` with the default value `HardwareInterfaceAdapter` to the `JointTrajectoryController`: `template <class SegmentImpl, class HardwareInterface, template <class HW, class S> class Adapter = HardwareInterfaceAdapter> class JointTrajectoryController` (see [here](https://github.com/ros-controls/ros_controllers/blob/678b92adfd9242c93b78c066a8369c7665ea1421/joint_trajectory_controller/include/joint_trajectory_controller/joint_trajectory_controller.h#L178)) .
 
+The following improvements are scheduled to be made to this repository.
 
-
-#### Potential improvements
-
-The following improvements could be applied to this repository:
-
+- Currently the controller parameters can't be configured with dynamic reconfigure. This is mainly due to a restriction of dynamic reconfigure that does not allow for variable-size parameters. We will implement a fixed size list of parameters that holds more parameters than necessary. In case the robot does not have the corresponding joints, the corresponding gains will be unused.
 - Simulating the hardware interface in Gazebo can be tricky. We should add a simple robot that only holds few joints. This might allows us to simulate the robot better in simulation. Additionally one could play around with the friction parameters to improve this behavior.
 - The actual control part currently is extracted into a single file. This would allow us to test the controller independently with unit tests. One could e.g.
   - Test that the controller controlling a robot in an upright position that should stay in that position does not generate a substantial force.

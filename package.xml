@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>compliant_controllers</name>
+  <version>0.0.0</version>
+  <description>A compliant joint trajectory controller with gravity compensation.</description>
+  <author email="tobit@robots.ox.ac.uk">Tobit Flatscher</author>
+  <author email="rm773@cornell.edu">Rishabh Madan</author>
+  <author email="rj277@cornell.edu">Rajat Kumar Jenamani</author>
+  <maintainer email="tobit@robots.ox.ac.uk">Tobit Flatscher</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>controller_interface</depend>
+  <depend>eigen</depend>
+  <depend>hardware_interface</depend>
+  <depend>joint_trajectory_controller</depend>
+  <depend>pinocchio</depend>
+  <depend>pluginlib</depend>
+  <depend>roscpp</depend>
+
+  <export>
+    <controller_interface plugin="${prefix}/controller_plugins.xml" />
+  </export>
+</package>
+

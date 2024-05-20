@@ -1,0 +1,143 @@
+/**
+ * \file hardware_interface_adapter_impl.h
+ * \mainpage
+ *   Implementation of the compliant hardware interface adapter
+ * 
+ * \authors
+ *   Tobit Flatscher <tobit@robots.ox.ac.uk>
+ * \copyright
+ *   Oxford Robotics Institute - University of Oxford (2024)
+ * \license
+ *   This project is released under the 3-clause BSD license.
+*/
+
+#ifndef COMPLIANT_CONTROLLERS__HARDWARE_INTERFACE_ADAPTER_IMPL
+#define COMPLIANT_CONTROLLERS__HARDWARE_INTERFACE_ADAPTER_IMPL
+#pragma once
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+// Pinocchio has to be included before ROS
+// See https://github.com/wxmerkt/pinocchio_ros_example
+#include <pinocchio/fwd.hpp>
+
+#include <Eigen/Eigen>
+#include <hardware_interface/joint_command_interface.h>
+#include <pinocchio/multibody/fwd.hpp>
+#include <pinocchio/parsers/urdf.hpp>
+#include <ros/ros.h>
+
+#include "compliant_controllers/joint_space_compliant_controller.h"
+#include "compliant_controllers/robot_state.h"
+
+
+namespace compliant_controllers {
+
+  template <typename State>
+  CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::CompliantHardwareInterfaceAdapter()
+  : joint_handles_ptr_{nullptr} {
+    return;
+  }
+
+  template <typename State>
+  bool CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::init(
+      std::vector<hardware_interface::JointHandle>& joint_handles, ros::NodeHandle& controller_nh) {
+    joint_handles_ptr_ = &joint_handles;
+
+    std::string robot_description_parameter {"/robot_description"};
+    if (!controller_nh.getParam("/robot_description_parameter", robot_description_parameter)) {
+      ROS_WARN_STREAM("Failed getting robot description parameter, defaulting to '" << robot_description_parameter << "'!");
+    }
+    std::string robot_description {};
+    if (!controller_nh.getParam(robot_description_parameter, robot_description)) {
+      ROS_ERROR_STREAM("Failed getting robot description from '" << robot_description_parameter << "'!");
+      return false;
+    }
+    auto robot_model = std::make_unique<pinocchio::Model>();
+    pinocchio::urdf::buildModelFromXML(robot_description, *robot_model.get());
+    if (!robot_model) {
+      ROS_ERROR_STREAM("Failed to load Pinocchio model from robot description '" << robot_description << "'!");
+      return false;
+    }
+    std::string end_effector_link {};
+    if (!controller_nh.getParam("/end_effector_link", end_effector_link)) {
+      ROS_ERROR_STREAM("Failed to get robot end effector link!");
+      return false;
+    }
+
+    // TODO: This should be templated so that we can switch between the joint and task space implementations easily
+    compliant_controller_ = std::make_unique<JointSpaceCompliantController>(std::move(robot_model), end_effector_link);
+
+    auto const num_of_dof {joint_handles_ptr_->size()};
+    desired_state_ = RobotState(num_of_dof);
+    current_state_ = RobotState(num_of_dof);
+    command_effort_.resize(num_of_dof);
+
+    // TODO: Set gains to the controller, allow to reset with dynamic reconfigure
+    return true;
+  }
+
+  template <typename State>
+  void CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::starting(
+      ros::Time const& /*time*/) {
+    if (!joint_handles_ptr_) {
+      ROS_ERROR_STREAM("Joint handles not initialized!");
+      return;
+    }
+    execute_default_command_ = true;
+    [[maybe_unused]] bool is_success {compliant_controller_->init()};
+    return;
+  }
+
+  template <typename State>
+  void CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::stopping(
+      ros::Time const& /*time*/) {
+    return;
+  }
+
+  template <typename State>
+  void CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::updateCommand(
+      ros::Time const& /*time*/, ros::Duration const& period, State const& desired_state,
+      State const& state_error) {
+    if (!joint_handles_ptr_) {
+      ROS_ERROR_STREAM("Joint handles not initialized!");
+      return;
+    }
+
+    for (std::size_t i = 0; i < joint_handles_ptr_->size(); ++i) {
+      auto& joint_handle {(*joint_handles_ptr_)[i]};
+      current_state_.positions(i) = joint_handle.getPosition();
+      if (current_state_.positions(i) < 0.0) {
+        current_state_.positions(i) += 2.0*M_PI;
+      }
+      current_state_.velocities(i) = joint_handle.getVelocity();
+      current_state_.efforts(i) = joint_handle.getEffort();
+    }
+    // TODO: Implement a compile-time type check for the State template parameter
+    if (!execute_default_command_) {
+      for (std::size_t i = 0; i < desired_state.position.size(); ++i) {
+        desired_state_.positions(i) = desired_state.position[i];
+        desired_state_.velocities(i) = desired_state.velocity[i];
+        desired_state_.accelerations(i) = desired_state.acceleration[i];
+      }
+    } else {
+      desired_state_.positions = current_state_.positions;
+      desired_state_.velocities.setZero();
+      execute_default_command_ = false;
+    }
+
+    // TODO: Perform checks that the dimensions are correct!
+    command_effort_ = compliant_controller_->computeEffort(desired_state_, current_state_, period);
+
+    for (std::size_t i = 0; i < command_effort_.size(); ++i) {
+      (*joint_handles_ptr_)[i].setCommand(command_effort_(i));
+    }
+    return;
+  }
+
+}
+
+#endif // COMPLIANT_CONTROLLERS__HARDWARE_INTERFACE_ADAPTER_IMPL

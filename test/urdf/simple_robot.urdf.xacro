@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="simple_robot">
+
+    <!-- Parameters -->
+    <xacro:property name="width"          value="0.05"/>
+    <xacro:property name="length"         value="0.05"/>
+    <xacro:property name="height"         value="0.2"/>
+    <xacro:property name="mass"           value="2.0"/>
+    <xacro:property name="element_prefix" value="element"/>
+    <xacro:arg      name="is_gravity"     default="true"/>
+
+    <!-- Macro for inertia matrix for rectangular box around its center -->
+    <xacro:macro name="box_inertial" params="m x y z dx dy dz">
+        <inertial>
+            <mass  value="${m}"/>
+            <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+            <inertia ixx="${m/12*(dy*dy + dz*dz)}" ixy="0.0" ixz="0.0"
+                     iyy="${m/12*(dx*dx + dz*dz)}" iyz="0.0"
+                     izz="${m/12*(dx*dx + dy*dy)}"/>
+        </inertial>
+    </xacro:macro>
+
+    <!-- Macro for a single element of box geometry -->
+    <xacro:macro name="elem" params="name m dx dy dz is_gravity:=true colour:=White">
+        <!-- Link without joint -->
+        <link name="${name}">
+            <visual>
+                <geometry>
+                    <box size="${dx} ${dy} ${dz}"/>
+                </geometry>
+                <origin xyz="0 0 ${-dz/2}" rpy="0 0 0"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${dx} ${dy} ${dz}"/>
+                </geometry>
+                <origin xyz="0 0 ${-dz/2}" rpy="0 0 0"/>
+            </collision>
+            <xacro:box_inertial m="${mass}" 
+                                x="0"       y="0"  z="${-dz/2}" 
+                                dx="${dx}" dy="${dy}"    dz="${dz}"/>
+        </link>
+
+        <!-- Gazebo simulation settings -->
+        <gazebo reference="${name}">
+            <selfCollide>true</selfCollide>
+            <static>false</static>
+            <turnGravityOff>${not is_gravity}</turnGravityOff>
+            <material>Gazebo/${colour}</material>
+        </gazebo>
+    </xacro:macro>
+
+    <!-- Fixed world frame -->
+    <link name="world"/>
+
+    <!-- Links -->
+    <xacro:elem name="${element_prefix}_1" m="${mass}" dx="${width}" dy="${length}" dz="${height}" is_gravity="$(arg is_gravity)" colour="Red"/>
+    <xacro:elem name="${element_prefix}_2" m="${mass}" dx="${width}" dy="${length}" dz="${height}" is_gravity="$(arg is_gravity)" colour="Green"/>
+
+    <!-- Joints -->
+    <!-- 1 to world -->
+    <joint name="world_joint" type="fixed">
+        <parent link="world"/>
+        <child  link="${element_prefix}_1"/>
+        <origin xyz="0 ${-cos(pi/4)*height} ${sin(pi/4)*height}" rpy="${pi/4} 0 0"/>
+    </joint>
+    <!-- 2 to 1 -->
+    <joint name="joint_1" type="continuous">
+        <axis xyz="1 0 0"/>
+        <parent link="${element_prefix}_1"/>
+        <child  link="${element_prefix}_2"/>
+        <origin xyz="0 0 0" rpy="${pi} 0 0"/>
+    </joint>
+    <transmission name="joint_1_transmission">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="joint_1">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="joint_1_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+    <!-- TODO: Add a loop that allows use to add multiple of these-->
+
+    <gazebo>
+      <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+        <robotNamespace>/simple_robot</robotNamespace>
+      </plugin>
+    </gazebo>
+
+</robot>

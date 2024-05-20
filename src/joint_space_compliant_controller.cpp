@@ -168,7 +168,7 @@ namespace compliant_controllers {
 
   Eigen::MatrixXd JointSpaceCompliantController::constructDiagonalMatrix(double const value, int const dim) {
     Eigen::VectorXd diag_elements {Eigen::VectorXd::Zero(dim)};
-    for (std::size_t i = 0; i < diag_elements.size(); ++i) {
+    for (Eigen::Index i = 0; i < diag_elements.size(); ++i) {
       diag_elements[i] = value;
     }
     Eigen::MatrixXd matrix {Eigen::MatrixXd::Zero(dim, dim)};

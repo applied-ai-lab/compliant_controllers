@@ -132,7 +132,7 @@ namespace compliant_controllers {
     // TODO: Perform checks that the dimensions are correct!
     command_effort_ = compliant_controller_->computeEffort(desired_state_, current_state_, period);
 
-    for (std::size_t i = 0; i < command_effort_.size(); ++i) {
+    for (Eigen::Index i = 0; i < command_effort_.size(); ++i) {
       (*joint_handles_ptr_)[i].setCommand(command_effort_(i));
     }
     return;

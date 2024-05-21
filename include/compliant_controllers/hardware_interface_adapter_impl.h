@@ -24,12 +24,14 @@
 // See https://github.com/wxmerkt/pinocchio_ros_example
 #include <pinocchio/fwd.hpp>
 
+#include <dynamic_reconfigure/server.h>
 #include <Eigen/Eigen>
 #include <hardware_interface/joint_command_interface.h>
 #include <pinocchio/multibody/fwd.hpp>
 #include <pinocchio/parsers/urdf.hpp>
 #include <ros/ros.h>
 
+#include "compliant_controllers/JointSpaceCompliantControllerConfig.h"
 #include "compliant_controllers/joint_space_compliant_controller.h"
 #include "compliant_controllers/robot_state.h"
 
@@ -71,12 +73,14 @@ namespace compliant_controllers {
     // TODO: This should be templated so that we can switch between the joint and task space implementations easily
     compliant_controller_ = std::make_unique<JointSpaceCompliantController>(std::move(robot_model), end_effector_link);
 
-    auto const num_of_dof {joint_handles_ptr_->size()};
-    desired_state_ = RobotState(num_of_dof);
-    current_state_ = RobotState(num_of_dof);
-    command_effort_.resize(num_of_dof);
+    num_of_dof_ = joint_handles_ptr_->size();
+    desired_state_ = RobotState(num_of_dof_);
+    current_state_ = RobotState(num_of_dof_);
+    command_effort_.resize(num_of_dof_);
 
-    // TODO: Set gains to the controller, allow to reset with dynamic reconfigure
+    using namespace boost::placeholders;
+    dynamic_reconfigure_callback_ = boost::bind(&CompliantHardwareInterfaceAdapter::dynamicReconfigureCallback, this, _1, _2);
+    dynamic_reconfigure_server_.setCallback(dynamic_reconfigure_callback_);
     return true;
   }
 
@@ -135,6 +139,54 @@ namespace compliant_controllers {
     for (Eigen::Index i = 0; i < command_effort_.size(); ++i) {
       (*joint_handles_ptr_)[i].setCommand(command_effort_(i));
     }
+    return;
+  }
+
+  template <typename State>
+  void CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, 
+    State>::dynamicReconfigureCallback(JointSpaceCompliantControllerConfig const& config,
+        [[maybe_unused]] uint32_t const level) {
+    Eigen::MatrixXd joint_stiffness_matrix {Eigen::MatrixXd::Zero(7,7)};
+    joint_stiffness_matrix.diagonal() << config.j_0, config.j_1, config.j_2, 
+                                         config.j_3, config.j_4, config.j_5, config.j_6;
+    [[maybe_unused]] bool is_success {compliant_controller_->setJointStiffnessMatrix(
+      joint_stiffness_matrix.block(0, 0, num_of_dof_, num_of_dof_)
+    )};
+
+    Eigen::MatrixXd rotor_inertia_matrix {Eigen::MatrixXd::Zero(7,7)};
+    rotor_inertia_matrix.diagonal() << config.b_0, config.b_1, config.b_2, 
+                                       config.b_3, config.b_4, config.b_5, config.b_6;
+    is_success = compliant_controller_->setRotorInertiaMatrix(
+      rotor_inertia_matrix.block(0, 0, num_of_dof_, num_of_dof_)
+    );
+
+    Eigen::MatrixXd friction_l {Eigen::MatrixXd::Zero(7,7)};
+    friction_l.diagonal() << config.l_0, config.l_1, config.l_2,
+                             config.l_3, config.l_4, config.l_5, config.l_6;
+    is_success = compliant_controller_->setFrictionL(
+      friction_l.block(0, 0, num_of_dof_, num_of_dof_)
+    );
+
+    Eigen::MatrixXd friction_lp {Eigen::MatrixXd::Zero(7,7)};
+    friction_lp.diagonal() << config.lp_0, config.lp_1, config.lp_2,
+                              config.lp_3, config.lp_4, config.lp_5, config.lp_6;
+    is_success = compliant_controller_->setFrictionLp(
+      friction_lp.block(0, 0, num_of_dof_, num_of_dof_)
+    );
+
+    Eigen::MatrixXd joint_k_matrix {Eigen::MatrixXd::Zero(7,7)};
+    joint_k_matrix.diagonal() << config.k_0, config.k_1, config.k_2,
+                                 config.k_3, config.k_4, config.k_5, config.k_6;
+    is_success = compliant_controller_->setJointKMatrix(
+      joint_k_matrix.block(0, 0, num_of_dof_, num_of_dof_)
+    );
+
+    Eigen::MatrixXd joint_d_matrix {Eigen::MatrixXd::Zero(7,7)};
+    joint_d_matrix.diagonal() << config.d_0, config.d_1, config.d_2,
+                                 config.d_3, config.d_4, config.d_5, config.d_6;
+    is_success = compliant_controller_->setJointDMatrix(
+      joint_d_matrix.block(0, 0, num_of_dof_, num_of_dof_)
+    );
     return;
   }
 

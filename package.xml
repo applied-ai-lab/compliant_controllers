@@ -11,6 +11,8 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>controller_interface</depend>
+  <depend>driver_base</depend>
+  <depend>dynamic_reconfigure</depend>
   <depend>eigen</depend>
   <depend>hardware_interface</depend>
   <depend>joint_trajectory_controller</depend>

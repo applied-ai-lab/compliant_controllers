@@ -36,7 +36,7 @@ $ rosrun rqt_controller_manager rqt_controller_manager
 
 ### Running in simulation
 
-This controller does not work well in simulation, even when increasing friction and damping for Gazebo inside the URDF. Probably the reason for this is that the `kortex_hardware` hardware interface implements torque filtering as well as gravity compensation that are both not handled by the simulated hardware interface. It seems to be workable when increasing stiffness of the system by increasing the joint stiffness matrix (e.g. to 8000), joint compliance proportional gain matrix (e.g. to 100) as well as the joint compliance derivative gain matrix (e.g. to 10).
+This controller does not work well in simulation, even when increasing friction and damping for Gazebo inside the URDF. Probably the reason for this is that the `kortex_hardware` hardware interface implements torque filtering as well as gravity compensation that are both not handled by the simulated hardware interface. It seems to be workable when increasing stiffness of the system by increasing the joint stiffness matrix (e.g. to `8000`), joint compliance proportional gain matrix (e.g. to `100`) as well as the joint compliance derivative gain matrix (e.g. to `10`).
 
 You can test the controllers on a single arm by installing `ros_kortex` (see [here](https://github.com/Kinovarobotics/ros_kortex)) and then **launching the Gazebo simulation**:
 
@@ -47,13 +47,13 @@ $ roslaunch kortex_gazebo spawn_kortex_robot.launch
 Then **run the `compliant_controller`** making sure it uses the same name space as the robot, by default `my_gen3`,
 
 ```bash
-$ roslaunch compliant_controllers compliant_controller.launch robot_description_parameter:=/my_gen3/robot_description __ns:=my_gen3
+$ roslaunch compliant_controllers joint_space_compliant_controller.launch robot_description_parameter:=/my_gen3/robot_description __ns:=my_gen3
 ```
 
 adjust the gains if necessary (as discussed above) and **switch to the compliant controller**:
 
 ```bash
-$ rosservice call /my_gen3/controller_manager/switch_controller "start_controllers: ['compliant_controller']
+$ rosservice call /my_gen3/controller_manager/switch_controller "start_controllers: ['joint_space_compliant_controller']
 stop_controllers: ['gen3_joint_trajectory_controller']
 strictness: 1
 start_asap: false
@@ -78,7 +78,7 @@ This package has a few limitations mostly stemming from its initial implementati
 - As outlined before the **friction observer** might lead to a significantly higher effort than the task effort if the hardware interface is not switched to `effort` and might trigger the emergency stop as a consequence. Ideally the effort **should be clipped** or be clippable in one of the configuration files.
 - Running the simulation currently requires modifications to the `ros_controllers` repository to run in **simulation**. A template argument has to be added to the `JointTrajectoryController` with the default value `HardwareInterfaceAdapter` to the `JointTrajectoryController`: `template <class SegmentImpl, class HardwareInterface, template <class HW, class S> class Adapter = HardwareInterfaceAdapter> class JointTrajectoryController` (see [here](https://github.com/ros-controls/ros_controllers/blob/678b92adfd9242c93b78c066a8369c7665ea1421/joint_trajectory_controller/include/joint_trajectory_controller/joint_trajectory_controller.h#L178))  and the joint trajectory controller in this repository has to call this `CompliantHardwareInterface` instead. Otherwise the code will run into a **segmentation fault inside Gazebo**.
 - The **controller and hardware interface** are **tightly integrated**. This is not very desirable as there is no clear separation of functionality (controller vs hardware interface) and forces its users to use this particular combination. Furthermore this results in problems with simulation as mentioned before.
-- Currently dynamic reconfigure does not support variable size arrays. For this reason we implemented dynamic reconfigure for a fixed size list of parameters holding more parameters than most traditional robotic arms (8). In case the robot does not have the corresponding joints, the last additional degrees of freedom will not be used.
+- Currently dynamic reconfigure does not support variable size arrays. For this reason we implemented dynamic reconfigure for a fixed size list of parameters holding sufficient parameters for most traditional robotic arms (7). In case the robot does not have the corresponding joints, the last additional degrees of freedom will not be used.
 - A task-space compliant controller could be created by porting the corresponding controller from the initial repository.
 - The actual control part currently is extracted into a single file. This would allow us to test the controller independently with unit tests. Currently this is not easily possible due to the tight integration of hardware interface (which does filtering and gravity compensation). One could e.g.
   - Test that the controller controlling a robot in an upright position that should stay in that position does not generate a substantial force.

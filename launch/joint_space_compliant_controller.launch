@@ -15,11 +15,11 @@
       output="screen"
       args="
         --stopped
-        compliant_controller
+        joint_space_compliant_controller
       "/>
 
   <!-- Load controller configuration -->
-  <rosparam file="$(find compliant_controllers)/config/compliant_controller.yaml" command="load" />
+  <rosparam file="$(find compliant_controllers)/config/joint_space_compliant_controller.yaml" command="load" />
 
   <!-- <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/> -->
 

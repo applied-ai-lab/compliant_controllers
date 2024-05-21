@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
+  driver_base
+  dynamic_reconfigure
   hardware_interface
   joint_trajectory_controller
   pluginlib
@@ -13,9 +15,15 @@ find_package(catkin REQUIRED COMPONENTS
 )
 find_package(pinocchio REQUIRED)
 
+generate_dynamic_reconfigure_options(
+  config/JointSpaceParams.cfg
+)
+
 catkin_package( 
   CATKIN_DEPENDS
   controller_interface
+  driver_base
+  dynamic_reconfigure
   hardware_interface
   joint_trajectory_controller
   pluginlib
@@ -30,7 +38,7 @@ include_directories(
 )
 link_directories(
   ${catkin_LIBRARY_DIRS}
-) 
+)
 
 add_library(${PROJECT_NAME}
   src/compliant_controllers.cpp
@@ -43,6 +51,7 @@ target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   pinocchio::pinocchio
 )
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
 install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

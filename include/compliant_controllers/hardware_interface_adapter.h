@@ -23,11 +23,13 @@
 // See https://github.com/wxmerkt/pinocchio_ros_example
 #include <pinocchio/fwd.hpp>
 
+#include <dynamic_reconfigure/server.h>
 #include <Eigen/Eigen>
 #include <hardware_interface/joint_command_interface.h>
 #include <joint_trajectory_controller/hardware_interface_adapter.h>
 #include <ros/ros.h>
 
+#include "compliant_controllers/JointSpaceCompliantControllerConfig.h"
 #include "compliant_controllers/joint_space_compliant_controller.h"
 #include "compliant_controllers/robot_state.h"
 
@@ -106,18 +108,34 @@ namespace compliant_controllers {
       void updateCommand(ros::Time const& /*time*/, ros::Duration const& period,
                          State const& desired_state, State const& /*state_error*/);
 
-      // TODO: Add a dynamic reconfigure here that allows us to configure the wrapped controller
-      // The parameters for joint and task space are slightly different, so we will have to
-      // use templates for this
-      // Furthermore think about how can use it with different length inputs
-
     protected:
+      /**\fn dynamicReconfigureCallback
+       * \brief
+       *   Dynamically reconfigure the joint stiffness and other controller parameters
+       *
+       * \param[in] config
+       *   The config to be parsed
+       * \param[in] period
+       *   The period of the controller
+       * \param[in] desired_state
+       *   The desired state that the controller should be set to
+       * \param[in] state_error
+       *   The current state error
+      */
+      void dynamicReconfigureCallback(JointSpaceCompliantControllerConfig const& config,
+        uint32_t const level);
+
       std::vector<hardware_interface::JointHandle>* joint_handles_ptr_;
       std::unique_ptr<JointSpaceCompliantController> compliant_controller_;
       bool execute_default_command_;
+      std::size_t num_of_dof_;
       RobotState desired_state_;
       RobotState current_state_;
       Eigen::VectorXd command_effort_;
+      dynamic_reconfigure::Server<
+        JointSpaceCompliantControllerConfig> dynamic_reconfigure_server_;
+      dynamic_reconfigure::Server<
+        JointSpaceCompliantControllerConfig>::CallbackType dynamic_reconfigure_callback_;
   };
 
 }

@@ -56,8 +56,7 @@ namespace compliant_controllers {
   class JointTrajectoryController: public
     joint_trajectory_controller::JointTrajectoryController<
       trajectory_interface::QuinticSplineSegment<double>,
-      hardware_interface::EffortJointInterface,
-      CompliantHardwareInterfaceAdapter
+      hardware_interface::EffortJointInterface
     > {
     public:
       JointTrajectoryController() = default;

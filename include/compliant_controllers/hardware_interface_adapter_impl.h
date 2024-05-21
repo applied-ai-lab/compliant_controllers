@@ -50,7 +50,7 @@ namespace compliant_controllers {
     joint_handles_ptr_ = &joint_handles;
 
     std::string robot_description_parameter {"/robot_description"};
-    if (!controller_nh.getParam("/robot_description_parameter", robot_description_parameter)) {
+    if (!controller_nh.getParam("robot_description_parameter", robot_description_parameter)) {
       ROS_WARN_STREAM("Failed getting robot description parameter, defaulting to '" << robot_description_parameter << "'!");
     }
     std::string robot_description {};
@@ -65,7 +65,7 @@ namespace compliant_controllers {
       return false;
     }
     std::string end_effector_link {};
-    if (!controller_nh.getParam("/end_effector_link", end_effector_link)) {
+    if (!controller_nh.getParam("end_effector_link", end_effector_link)) {
       ROS_ERROR_STREAM("Failed to get robot end effector link!");
       return false;
     }

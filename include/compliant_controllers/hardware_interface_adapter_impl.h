@@ -70,13 +70,13 @@ namespace compliant_controllers {
       return false;
     }
 
-    // TODO: This should be templated so that we can switch between the joint and task space implementations easily
-    compliant_controller_ = std::make_unique<JointSpaceCompliantController>(std::move(robot_model), end_effector_link);
-
     num_of_dof_ = joint_handles_ptr_->size();
     desired_state_ = RobotState(num_of_dof_);
     current_state_ = RobotState(num_of_dof_);
     command_effort_.resize(num_of_dof_);
+
+    // TODO: This should be templated so that we can switch between the joint and task space implementations easily
+    compliant_controller_ = std::make_unique<JointSpaceCompliantController>(std::move(robot_model), end_effector_link, num_of_dof_);
 
     using namespace boost::placeholders;
     dynamic_reconfigure_callback_ = boost::bind(&CompliantHardwareInterfaceAdapter::dynamicReconfigureCallback, this, _1, _2);

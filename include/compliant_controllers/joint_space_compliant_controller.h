@@ -52,7 +52,8 @@ namespace compliant_controllers {
        *   The end-effector link of the kinematic chain
       */
       JointSpaceCompliantController(std::unique_ptr<pinocchio::Model> robot_model,
-                                    std::string const& end_effector_link);
+                                    std::string const& end_effector_link,
+                                    int num_controlled_dofs);
       JointSpaceCompliantController() = delete;
       JointSpaceCompliantController(JointSpaceCompliantController const&) = default;
       JointSpaceCompliantController& operator= (JointSpaceCompliantController const&) = default;

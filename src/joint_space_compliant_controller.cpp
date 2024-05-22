@@ -41,10 +41,10 @@
 namespace compliant_controllers {
 
   JointSpaceCompliantController::JointSpaceCompliantController(
-      std::unique_ptr<pinocchio::Model> robot_model, std::string const& end_effector_link)
+      std::unique_ptr<pinocchio::Model> robot_model, std::string const& end_effector_link, int num_controlled_dofs)
   : robot_model_{std::move(robot_model)}, end_effector_link_{},
     data_{std::make_unique<pinocchio::Data>(*robot_model_.get())},
-    num_controlled_dofs_{robot_model_->nv},
+    num_controlled_dofs_{num_controlled_dofs},
     end_effector_index_{robot_model_->getFrameId(end_effector_link)} {
     setDefaultValues();
     extended_joints_ = std::make_unique<ExtendedJointPositions>(num_controlled_dofs_);

@@ -50,10 +50,12 @@ namespace compliant_controllers {
        *   The robot model
        * \param[in] end_effector_link
        *   The end-effector link of the kinematic chain
+       * \param[in] num_controlled_dofs
+       *   The number of degree of freedoms that the controller should control
       */
       JointSpaceCompliantController(std::unique_ptr<pinocchio::Model> robot_model,
                                     std::string const& end_effector_link,
-                                    int num_controlled_dofs);
+                                    int const num_controlled_dofs);
       JointSpaceCompliantController() = delete;
       JointSpaceCompliantController(JointSpaceCompliantController const&) = default;
       JointSpaceCompliantController& operator= (JointSpaceCompliantController const&) = default;
@@ -211,8 +213,6 @@ namespace compliant_controllers {
       Eigen::VectorXd desired_positions_;
       Eigen::VectorXd current_theta_;
       Eigen::VectorXd gravity_;
-      Eigen::VectorXd desired_theta_;
-      Eigen::VectorXd desired_theta_dot_;
       Eigen::VectorXd task_effort_;
       Eigen::VectorXd nominal_theta_d_dot_;
       Eigen::VectorXd nominal_theta_dot_;

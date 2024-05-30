@@ -41,7 +41,8 @@
 namespace compliant_controllers {
 
   JointSpaceCompliantController::JointSpaceCompliantController(
-      std::unique_ptr<pinocchio::Model> robot_model, std::string const& end_effector_link, int num_controlled_dofs)
+      std::unique_ptr<pinocchio::Model> robot_model, std::string const& end_effector_link,
+      int const num_controlled_dofs)
   : robot_model_{std::move(robot_model)}, end_effector_link_{},
     data_{std::make_unique<pinocchio::Data>(*robot_model_.get())},
     num_controlled_dofs_{num_controlled_dofs},
@@ -134,29 +135,21 @@ namespace compliant_controllers {
     current_theta_ = extended_joints_->getPositions();
     gravity_ = pinocchio::computeGeneralizedGravity(*robot_model_, *data_, joint_ros_to_pinocchio(current_theta_, *robot_model_));
 
-    desired_theta_ = desired_positions_ + joint_stiffness_matrix_.inverse()*gravity_;
-    desired_theta_dot_ = desired_state.velocities;
+    task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - joint_stiffness_matrix_.inverse()*gravity_) - 
+                    joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities) + gravity_;
 
-    task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_theta_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_theta_dot_);
-
-    double const step_time {0.001};
-
-    nominal_theta_d_dot_ = rotor_inertia_matrix_.inverse()*(task_effort_ + gravity_ + current_state.efforts);
+    double const step_time {period.toSec()};
+    nominal_theta_d_dot_ = rotor_inertia_matrix_.inverse()*(task_effort_ - current_state.efforts);
     nominal_theta_dot_ = nominal_theta_dot_prev_ + nominal_theta_d_dot_*step_time;
     nominal_theta_ = nominal_theta_prev_ + nominal_theta_dot_*step_time;
 
-    nominal_friction_ = rotor_inertia_matrix_*friction_l_*((nominal_theta_dot_ - current_state.velocities) + friction_lp_*(nominal_theta_ - current_theta_));
+    nominal_friction_ = rotor_inertia_matrix_*friction_l_*((nominal_theta_dot_ - current_state.velocities) + 
+                        friction_lp_*(nominal_theta_ - current_theta_));
 
     efforts_ = task_effort_ + nominal_friction_;
 
     nominal_theta_prev_ = nominal_theta_;
     nominal_theta_dot_prev_ = nominal_theta_dot_;
-
-    // TODO: We will be falling for 50 iterations before we generate any effort, won't we?
-    if (count_ < 50) {
-      efforts_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
-      ++count_;
-    }
 
     return efforts_;
   }

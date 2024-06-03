@@ -45,6 +45,7 @@ add_library(${PROJECT_NAME}
   src/extended_joint_positions.cpp
   src/joint_space_compliant_controller.cpp
   src/utils.cpp
+  src/integral_action.cpp
 )
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
 target_link_libraries(${PROJECT_NAME}

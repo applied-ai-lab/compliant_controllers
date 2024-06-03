@@ -92,7 +92,7 @@ namespace compliant_controllers {
       return;
     }
     execute_default_command_ = true;
-    [[maybe_unused]] bool is_success {compliant_controller_->init()};
+    bool is_success {compliant_controller_->init()};
     return;
   }
 
@@ -173,6 +173,20 @@ namespace compliant_controllers {
     is_success = compliant_controller_->setFrictionLp(
       friction_lp.block(0, 0, num_of_dof_, num_of_dof_)
     );
+
+    Eigen::MatrixXd friction_li {Eigen::MatrixXd::Zero(7,7)};
+    friction_li.diagonal() << config.li_0, config.li_1, config.li_2,
+                              config.li_3, config.li_4, config.li_5, config.li_6;
+    is_success = compliant_controller_->setFrictionLi(
+      friction_li.block(0, 0, num_of_dof_, num_of_dof_)
+    );
+
+    Eigen::VectorXd friction_e_max {Eigen::VectorXd::Zero(7)};
+    friction_e_max << config.e_max_0, config.e_max_1, config.e_max_2, 
+                      config.e_max_3, config.e_max_4, config.e_max_5, config.e_max_6;
+    is_success = compliant_controller_->setMaxJointError(
+      friction_e_max.head(num_of_dof_)
+    ); 
 
     Eigen::MatrixXd joint_k_matrix {Eigen::MatrixXd::Zero(7,7)};
     joint_k_matrix.diagonal() << config.k_0, config.k_1, config.k_2,

@@ -58,8 +58,11 @@ namespace compliant_controllers {
     rotor_inertia_matrix_ = constructDiagonalMatrix(0.3, num_controlled_dofs_);
     friction_l_ = constructDiagonalMatrix(60, num_controlled_dofs_);
     friction_lp_ = constructDiagonalMatrix(4, num_controlled_dofs_);
+    friction_li_ = constructDiagonalMatrix(0, num_controlled_dofs_);
     joint_k_matrix_ = constructDiagonalMatrix(10, num_controlled_dofs_);
     joint_d_matrix_ = constructDiagonalMatrix(2, num_controlled_dofs_);
+    q_error_.setZero(num_controlled_dofs_);
+    q_error_sum_.setZero(num_controlled_dofs_);
     return;
   }
 
@@ -97,6 +100,14 @@ namespace compliant_controllers {
     return true;
   }
 
+  bool JointSpaceCompliantController::setFrictionLi(Eigen::MatrixXd const& friction_li) {
+    if (!checkMatrix(friction_li)) {
+      return false;
+    }
+    friction_li_ = friction_li;
+    return true;
+  }
+
   bool JointSpaceCompliantController::setJointKMatrix(Eigen::MatrixXd const& joint_k_matrix) {
     if (!checkMatrix(joint_k_matrix)) {
       return false;
@@ -113,8 +124,17 @@ namespace compliant_controllers {
     return true;
   }
 
+  bool JointSpaceCompliantController::setMaxJointError(Eigen::VectorXd const& joint_error_max)
+  {
+    if (!joint_error_max.rows() != num_controlled_dofs_) return false;
+    q_error_max_ = joint_error_max;
+    return true;
+  }
+
   bool JointSpaceCompliantController::init() {
     count_ = 0;
+    q_error_.setZero();
+    q_error_sum_.setZero();
     return true;
   }
 
@@ -143,8 +163,12 @@ namespace compliant_controllers {
     nominal_theta_dot_ = nominal_theta_dot_prev_ + nominal_theta_d_dot_*step_time;
     nominal_theta_ = nominal_theta_prev_ + nominal_theta_dot_*step_time;
 
+    // Integrate friction error
+    q_error_sum_ = integrate_error(current_theta_, nominal_theta_);
+
     nominal_friction_ = rotor_inertia_matrix_*friction_l_*((nominal_theta_dot_ - current_state.velocities) + 
-                        friction_lp_*(nominal_theta_ - current_theta_));
+                        friction_lp_*(nominal_theta_ - current_theta_)
+                        - friction_li_ * q_error_sum_);
 
     efforts_ = task_effort_ + nominal_friction_;
 
@@ -152,6 +176,16 @@ namespace compliant_controllers {
     nominal_theta_dot_prev_ = nominal_theta_dot_;
 
     return efforts_;
+  }
+
+  Eigen::VectorXd JointSpaceCompliantController::integrate_error(Eigen::VectorXd const& current_q, 
+                                                                 Eigen::VectorXd const& desired_q)
+  {
+    q_error_ = desired_q - current_q;
+    q_error_sum_ += q_error_;
+    // Clamp the integrated error
+    q_error_sum_ = q_error_sum_.cwiseMin(q_error_max_).cwiseMax(-q_error_max_);
+    return q_error_sum_;
   }
 
   Eigen::MatrixXd JointSpaceCompliantController::constructDiagonalMatrix(double const value, int const dim) {

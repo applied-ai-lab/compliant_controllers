@@ -171,11 +171,11 @@ namespace compliant_controllers {
     nominal_theta_ = nominal_theta_prev_ + nominal_theta_dot_*step_time;
 
     // Integrate friction error
-    q_error_sum_ = integrate_error(current_theta_, nominal_theta_);
+    q_error_sum_ = integrate_error(nominal_theta_, current_theta_);
 
     nominal_friction_ = rotor_inertia_matrix_*friction_l_*((nominal_theta_dot_ - current_state.velocities) + 
                         friction_lp_*(nominal_theta_ - current_theta_)
-                        - friction_li_ * q_error_sum_);
+                        + friction_li_ * q_error_sum_);
 
     efforts_ = task_effort_ + nominal_friction_;
 
@@ -185,8 +185,8 @@ namespace compliant_controllers {
     return efforts_;
   }
 
-  Eigen::VectorXd JointSpaceCompliantController::integrate_error(Eigen::VectorXd const& current_q, 
-                                                                 Eigen::VectorXd const& desired_q)
+  Eigen::VectorXd JointSpaceCompliantController::integrate_error(Eigen::VectorXd const& desired_q,
+                                                                 Eigen::VectorXd const& current_q)
   {
     q_error_ = desired_q - current_q;
     q_error_sum_ += q_error_;

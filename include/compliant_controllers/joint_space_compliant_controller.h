@@ -194,16 +194,16 @@ namespace compliant_controllers {
        * \brief
        *   Sum error between \p current_q and \p desired_q clamp using q_error_max_
        * 
-       * \param[in] current_q
-       *   The state that the robot should be set to
        * \param[in] desired_q
        *   The state that the robot is currently in
+       * \param[in] current_q
+       *   The state that the robot should be set to
        * \return
        *   The sum of the errors
       */
       [[nodiscard]]
-      Eigen::VectorXd integrate_error(Eigen::VectorXd const& current_q, 
-                                      Eigen::VectorXd const& desired_q);
+      Eigen::VectorXd integrate_error(Eigen::VectorXd const& desired_q, 
+                                      Eigen::VectorXd const& current_q);
       
 
     protected:

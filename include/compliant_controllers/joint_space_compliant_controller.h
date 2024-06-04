@@ -116,6 +116,18 @@ namespace compliant_controllers {
       [[nodiscard]]
       bool setFrictionLp(Eigen::MatrixXd const& friction_lp);
 
+      /**\fn setFrictionLi
+       * \brief
+       *   Set the friction observer matrix integral gain
+       * 
+       * \param[in] friction_li
+       *   The friction observer matrix integral gain
+       * \return
+       *   Boolean variable signalling success or failure
+      */
+      [[nodiscard]]
+      bool setFrictionLi(Eigen::MatrixXd const& friction_li);
+
       /**\fn setJointKMatrix
        * \brief
        *   Set the joint compliance proportional gain matrix
@@ -140,9 +152,21 @@ namespace compliant_controllers {
       [[nodiscard]]
       bool setJointDMatrix(Eigen::MatrixXd const& joint_d_matrix);
 
+      /**\fn setMaxJointError
+       * \brief
+       *   Set the joint integrator max error
+       * 
+       * \param[in] joint_error_max
+       *   The joint compliance derivative gain matrix to be set
+       * \return
+       *   Boolean variable signalling success or failure
+      */
+      [[nodiscard]]
+      bool setMaxJointError(Eigen::VectorXd const& joint_error_max);
+
       /**\fn init
        * \brief
-       *   Initialize the controller
+       *   Initialize and Reset the controller
        * 
        * \return
        *   Boolean variable signalling success or failure
@@ -165,6 +189,22 @@ namespace compliant_controllers {
       */
       [[nodiscard]]
       Eigen::VectorXd computeEffort(RobotState const& desired_state, RobotState const& current_state, ros::Duration const& period);
+
+      /**\fn integrate_error
+       * \brief
+       *   Sum error between \p current_q and \p desired_q clamp using q_error_max_
+       * 
+       * \param[in] desired_q
+       *   The state that the robot is currently in
+       * \param[in] current_q
+       *   The state that the robot should be set to
+       * \return
+       *   The sum of the errors
+      */
+      [[nodiscard]]
+      Eigen::VectorXd integrate_error(Eigen::VectorXd const& desired_q, 
+                                      Eigen::VectorXd const& current_q);
+      
 
     protected:
       /**\fn constructDiagonalMatrix
@@ -198,12 +238,18 @@ namespace compliant_controllers {
       std::unique_ptr<pinocchio::Data> data_;
       int num_controlled_dofs_;
       pinocchio::Model::Index end_effector_index_;
-      Eigen::MatrixXd joint_stiffness_matrix_;
+      Eigen::MatrixXd inverse_joint_stiffness_matrix_;
       Eigen::MatrixXd rotor_inertia_matrix_;
+      Eigen::MatrixXd inverse_rotor_inertia_matrix_;
       Eigen::MatrixXd friction_l_;
       Eigen::MatrixXd friction_lp_;
+      Eigen::MatrixXd friction_li_;           // Integral friction observer gain
       Eigen::MatrixXd joint_k_matrix_;
       Eigen::MatrixXd joint_d_matrix_;
+      // Integrator quantities
+      Eigen::VectorXd q_error_;
+      Eigen::VectorXd q_error_sum_;
+      Eigen::VectorXd q_error_max_;
       std::unique_ptr<ExtendedJointPositions> extended_joints_;
       int count_;
 

@@ -238,8 +238,9 @@ namespace compliant_controllers {
       std::unique_ptr<pinocchio::Data> data_;
       int num_controlled_dofs_;
       pinocchio::Model::Index end_effector_index_;
-      Eigen::MatrixXd joint_stiffness_matrix_;
+      Eigen::MatrixXd inverse_joint_stiffness_matrix_;
       Eigen::MatrixXd rotor_inertia_matrix_;
+      Eigen::MatrixXd inverse_rotor_inertia_matrix_;
       Eigen::MatrixXd friction_l_;
       Eigen::MatrixXd friction_lp_;
       Eigen::MatrixXd friction_li_;           // Integral friction observer gain

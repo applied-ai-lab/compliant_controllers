@@ -54,8 +54,10 @@ namespace compliant_controllers {
   }
 
   void JointSpaceCompliantController::setDefaultValues() {
-    joint_stiffness_matrix_ = constructDiagonalMatrix(3750, num_controlled_dofs_);
+    Eigen::MatrixXd const joint_stiffness_matrix {constructDiagonalMatrix(3750, num_controlled_dofs_)};
+    inverse_joint_stiffness_matrix_ = joint_stiffness_matrix.inverse();
     rotor_inertia_matrix_ = constructDiagonalMatrix(0.3, num_controlled_dofs_);
+    inverse_rotor_inertia_matrix_ = rotor_inertia_matrix_.inverse();
     friction_l_ = constructDiagonalMatrix(60, num_controlled_dofs_);
     friction_lp_ = constructDiagonalMatrix(4, num_controlled_dofs_);
     friction_li_ = constructDiagonalMatrix(0, num_controlled_dofs_);
@@ -72,7 +74,7 @@ namespace compliant_controllers {
     if (!checkMatrix(joint_stiffness_matrix)) {
       return false;
     }
-    joint_stiffness_matrix_ = joint_stiffness_matrix;
+    inverse_joint_stiffness_matrix_ = joint_stiffness_matrix.inverse();
     return true;
   }
 
@@ -82,6 +84,7 @@ namespace compliant_controllers {
       return false;
     }
     rotor_inertia_matrix_ = rotor_inertia_matrix;
+    inverse_rotor_inertia_matrix_ = rotor_inertia_matrix.inverse();
     return true;
   }
 
@@ -156,11 +159,14 @@ namespace compliant_controllers {
     current_theta_ = extended_joints_->getPositions();
     gravity_ = pinocchio::computeGeneralizedGravity(*robot_model_, *data_, joint_ros_to_pinocchio(current_theta_, *robot_model_));
 
-    task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - joint_stiffness_matrix_.inverse()*gravity_) - 
-                    joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities) + gravity_;
+    // Gravity compensation is performed inside the hardware interface
+    task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_) - 
+                    joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 
-    double const step_time {period.toSec()};
-    nominal_theta_d_dot_ = rotor_inertia_matrix_.inverse()*(task_effort_ - current_state.efforts);
+    // Time step smaller than period.toSec() potentially because of too small rotor inertia matrix
+    double const step_time {0.001};
+    // Sign of the current state effort seems to be negative of commanded
+    nominal_theta_d_dot_ = inverse_rotor_inertia_matrix_*(task_effort_ + gravity_ + current_state.efforts);
     nominal_theta_dot_ = nominal_theta_dot_prev_ + nominal_theta_d_dot_*step_time;
     nominal_theta_ = nominal_theta_prev_ + nominal_theta_dot_*step_time;
 

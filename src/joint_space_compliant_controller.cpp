@@ -61,8 +61,9 @@ namespace compliant_controllers {
     friction_li_ = constructDiagonalMatrix(0, num_controlled_dofs_);
     joint_k_matrix_ = constructDiagonalMatrix(10, num_controlled_dofs_);
     joint_d_matrix_ = constructDiagonalMatrix(2, num_controlled_dofs_);
-    q_error_.setZero(num_controlled_dofs_);
-    q_error_sum_.setZero(num_controlled_dofs_);
+    q_error_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
+    q_error_sum_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
+    q_error_max_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
     return;
   }
 

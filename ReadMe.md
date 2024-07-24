@@ -69,6 +69,27 @@ $ rosrun rqt_joint_trajectory_controller rqt_joint_trajectory_controller __ns:=m
 Choose the corresponding controller manager, select the desired joint trajectory controller and switch it to active. You should now be able to move all joints independently in a smooth manner with the sliders.
 
 
+## Sending Smooth Trajecotories and Replanning
+
+As mentioned, this controller is a compliant controller wrapping a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller). You can send a **sparse** trajectory to this controller and the controller will interpolate between the points. Additionally, it is possible to send a new trajectory to the controller and it will **replace** the previous plan and interpolate between the current motion and the new trajectory. This permits continuous replanning currently tested at ~10Hz.
+
+### Replanning Tips
+
+Documentation on replanning with the trajectory follower controller is found [`here`](https://wiki.ros.org/joint_trajectory_controller/UnderstandingTrajectoryReplacement).
+
+The controller interpolates between trajectories using splines of varying order. See the table below for more details:
+
+| Spline Order  | Poses | Velocities | Accelerations | Notes                |
+| ------------- | ----- | ---------- | ------------- | -------------------- |
+| 3             | Yes   | No         | No            | Not recommended      | 
+| 4             | Yes   | Yes        | No            |                      |
+| 5             | Yes   | Yes        | Yes           |                      |   
+
+
+The trajectory follower fits a spline starting at the *current* joint positions, velocities and accelerations and ending at the beginning of a *future* set point. As shown above, smoothest results are achieved when velocities and accelerations are included in the new trajectory. 
+
+Furthermore, do not send a new trajectory with a set point at the current joint state. For example, if you are at timestep t, do not send a pose for this timestep, but send the set point for t + 1 as the initial or only pose. The trajectory follower will interpolate from its own states at t and find a smooth path to the set point at t + 1. See Figure 2 in [`UnderstaningJointTrajectoryReplacement`](https://wiki.ros.org/joint_trajectory_controller/UnderstandingTrajectoryReplacement) for an example of this.
+   
 
 ## Known issues
 

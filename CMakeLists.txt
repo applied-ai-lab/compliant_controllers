@@ -17,6 +17,7 @@ find_package(pinocchio REQUIRED)
 
 generate_dynamic_reconfigure_options(
   config/JointSpaceParams.cfg
+  config/TaskSpaceParams.cfg
 )
 
 catkin_package( 
@@ -44,6 +45,7 @@ add_library(${PROJECT_NAME}
   src/compliant_controllers.cpp
   src/extended_joint_positions.cpp
   src/joint_space_compliant_controller.cpp
+  src/task_space_compliant_controller.cpp
   src/utils.cpp
 )
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${PINOCCHIO_CFLAGS_OTHER})

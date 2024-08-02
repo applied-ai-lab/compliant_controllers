@@ -204,6 +204,11 @@ namespace compliant_controllers {
       [[nodiscard]]
       Eigen::VectorXd integrate_error(Eigen::VectorXd const& desired_q, 
                                       Eigen::VectorXd const& current_q);
+
+      void advanceKinematics(Eigen::VectorXd const& q);
+
+      Eigen::Isometry3d getFrameTransform(Eigen::VectorXd const& q,
+                                          pinocchio::Model::Index const& frame_idx);
       
 
     protected:
@@ -262,6 +267,8 @@ namespace compliant_controllers {
       Eigen::Isometry3d desired_ee_transform_; 
       Eigen::Quaterniond desired_ee_quat_;
       Eigen::Quaterniond error_quat_;
+      Eigen::Matrix3d tempMat3d_;
+      Eigen::Isometry3d tempIsometry3d_;
 
       Eigen::VectorXd taskspace_effort_;
 

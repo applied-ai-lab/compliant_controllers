@@ -66,6 +66,8 @@ namespace compliant_controllers {
     q_error_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
     q_error_sum_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
     q_error_max_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
+    tempMat3d_ = Eigen::Matrix3d::Zero();
+    tempIsometry3d_ = Eigen::Isometry3d::Identity();
     return;
   }
 
@@ -142,6 +144,26 @@ namespace compliant_controllers {
     return true;
   }
 
+  void TaskSpaceCompliantController::advanceKinematics(Eigen::VectorXd const& q)
+  {
+    pinocchio::forwardKinematics(*robot_model_, *data_, joint_ros_to_pinocchio(desired_positions_, *robot_model_));
+    pinocchio::computeJointJacobians(*robot_model_, *data_, joint_ros_to_pinocchio(desired_positions_, *robot_model_));
+    pinocchio::updateFramePlacements(*robot_model_, *data_);
+  }
+
+  Eigen::Isometry3d TaskSpaceCompliantController::getFrameTransform(Eigen::VectorXd const& q,
+                                                                    pinocchio::Model::Index const& frame_idx)
+  {
+    advanceKinematics(q);
+    tempIsometry3d_ = data_->oMf[frame_idx].toHomogeneousMatrix_impl();
+    tempMat3d_ = tempIsometry3d_.linear();
+    // [Emprise Lab] Make first and second column negative to account for axis convention
+    tempMat3d_.col(0) *= -1.0;
+    tempMat3d_.col(1) *= -1.0;
+    tempIsometry3d_.linear() = tempMat3d_;
+    return tempIsometry3d_;
+  }
+
   Eigen::VectorXd TaskSpaceCompliantController::computeEffort(RobotState const& desired_state,
       RobotState const&  current_state, ros::Duration const& period) {    
     desired_positions_ = desired_state.positions;
@@ -162,29 +184,11 @@ namespace compliant_controllers {
     // DESIRED AND NOMINAL TRANSFORMS FOR ERROR PREDICTION
 
     // Get desired ee position from desired joint states
-    pinocchio::computeJointJacobians(*robot_model_, *data_, joint_ros_to_pinocchio(desired_positions_, *robot_model_));
-    pinocchio::updateFramePlacement(*robot_model_, *data_, end_effector_index_);
-    desired_ee_transform_ = data_->oMf[end_effector_index_].toHomogeneousMatrix_impl();
-
-    // [TODO] Does this work???
-    auto tmp0 = desired_ee_transform_.linear();
-    // Make first and second column negative to account for axis convention
-    tmp0.col(0) = -tmp0.col(0);
-    tmp0.col(1) = -tmp0.col(1);
-
+    desired_ee_transform_ = getFrameTransform(desired_positions_, end_effector_index_);
     desired_ee_quat_ = Eigen::Quaterniond(desired_ee_transform_.linear());
 
     // Get nominal ee position from desired joint states
-    pinocchio::computeJointJacobians(*robot_model_, *data_, joint_ros_to_pinocchio(nominal_theta_prev_, *robot_model_));
-    pinocchio::updateFramePlacement(*robot_model_, *data_, end_effector_index_);
-    nominal_ee_transform_ = data_->oMf[end_effector_index_].toHomogeneousMatrix_impl();
-    
-    // [TODO] Does this work???
-    auto tmp1 = nominal_ee_transform_.linear();
-    // Make first and second column negative to account for axis convention
-    tmp1.col(0) = -tmp1.col(0);
-    tmp1.col(1) = -tmp1.col(1);
-
+    nominal_ee_transform_ = getFrameTransform(nominal_theta_prev_, end_effector_index_);
     nominal_ee_quat_ = Eigen::Quaterniond(nominal_ee_transform_.linear());
 
     pinocchio::getFrameJacobian(*robot_model_, *data_, end_effector_index_, pinocchio::LOCAL_WORLD_ALIGNED, taskspace_jacobian_);

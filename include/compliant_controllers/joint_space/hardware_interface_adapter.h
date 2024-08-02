@@ -30,11 +30,12 @@
 #include <ros/ros.h>
 
 #include "compliant_controllers/JointSpaceCompliantControllerConfig.h"
-#include "compliant_controllers/joint_space_compliant_controller.h"
+#include "compliant_controllers/joint_space/joint_space_compliant_controller.h"
 #include "compliant_controllers/robot_state.h"
 
 
 namespace compliant_controllers {
+  namespace joint_space {
 
   // This is needed as we only want to specialize the effort implementation
   template <typename HardwareInterface, typename State>
@@ -136,10 +137,11 @@ namespace compliant_controllers {
         JointSpaceCompliantControllerConfig> dynamic_reconfigure_server_;
       dynamic_reconfigure::Server<
         JointSpaceCompliantControllerConfig>::CallbackType dynamic_reconfigure_callback_;
-  };
-
+    };
+  
+  }
 }
 
 #endif // COMPLIANT_CONTROLLERS__HARDWARE_INTERFACE_ADAPTER
 
-#include "compliant_controllers/hardware_interface_adapter_impl.h"
+#include "compliant_controllers/joint_space/hardware_interface_adapter_impl.h"

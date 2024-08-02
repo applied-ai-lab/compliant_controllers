@@ -42,10 +42,11 @@ link_directories(
 )
 
 add_library(${PROJECT_NAME}
-  src/compliant_controllers.cpp
+  src/joint_space/compliant_controllers.cpp
+  src/task_space/compliant_controllers.cpp
   src/extended_joint_positions.cpp
-  src/joint_space_compliant_controller.cpp
-  src/task_space_compliant_controller.cpp
+  src/joint_space/joint_space_compliant_controller.cpp
+  src/task_space/task_space_compliant_controller.cpp
   src/utils.cpp
 )
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${PINOCCHIO_CFLAGS_OTHER})

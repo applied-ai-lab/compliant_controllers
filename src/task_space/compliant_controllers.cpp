@@ -22,7 +22,7 @@
 #include <joint_trajectory_controller/joint_trajectory_controller.h>
 #include <trajectory_interface/quintic_spline_segment.h>
 
-#include "compliant_controllers/hardware_interface_adapter.h"
+#include "compliant_controllers/task_space/hardware_interface_adapter.h"
 
 
 // Convenient alias
@@ -36,7 +36,7 @@ using TrajectoryState = joint_trajectory_controller::JointTrajectorySegment<
 */
 template <>
 class HardwareInterfaceAdapter<hardware_interface::EffortJointInterface,TrajectoryState>: public
-      compliant_controllers::CompliantHardwareInterfaceAdapter<
+      compliant_controllers::task_space::CompliantHardwareInterfaceAdapter<
         hardware_interface::EffortJointInterface,TrajectoryState
       > {
   public:
@@ -48,29 +48,30 @@ class HardwareInterfaceAdapter<hardware_interface::EffortJointInterface,Trajecto
 };
 
 namespace compliant_controllers {
+  namespace task_space {
 
-  /**\class JointTrajectoryController
-   * \brief
-   *   Compliant joint trajectory controller using the compliant hardware interface adapter
-  */
-  class JointTrajectoryController: public
-    joint_trajectory_controller::JointTrajectoryController<
-      trajectory_interface::QuinticSplineSegment<double>,
-      hardware_interface::EffortJointInterface
-    > {
-    public:
-      JointTrajectoryController() = default;
-      JointTrajectoryController(JointTrajectoryController const&) = default;
-      JointTrajectoryController& operator= (JointTrajectoryController const&) = default;
-      JointTrajectoryController(JointTrajectoryController&&) = default;
-      JointTrajectoryController& operator= (JointTrajectoryController&&) = default;
-  };
-
+    /**\class TaskSpaceJointTrajectoryController
+     * \brief
+     *   Compliant joint trajectory controller using the compliant hardware interface adapter
+    */
+    class TaskSpaceJointTrajectoryController: public
+      joint_trajectory_controller::JointTrajectoryController<
+        trajectory_interface::QuinticSplineSegment<double>,
+        hardware_interface::EffortJointInterface
+      > {
+      public:
+        TaskSpaceJointTrajectoryController() = default;
+        TaskSpaceJointTrajectoryController(TaskSpaceJointTrajectoryController const&) = default;
+        TaskSpaceJointTrajectoryController& operator= (TaskSpaceJointTrajectoryController const&) = default;
+        TaskSpaceJointTrajectoryController(TaskSpaceJointTrajectoryController&&) = default;
+        TaskSpaceJointTrajectoryController& operator= (TaskSpaceJointTrajectoryController&&) = default;
+    };
+  }
 }
 
 #include <pluginlib/class_list_macros.h>
 
 PLUGINLIB_EXPORT_CLASS(
-  compliant_controllers::JointTrajectoryController, controller_interface::ControllerBase
+  compliant_controllers::task_space::TaskSpaceJointTrajectoryController, controller_interface::ControllerBase
 )
 

@@ -1,9 +1,16 @@
 <library path="lib/libcompliant_controllers">
-    <class name="compliant_controllers/JointTrajectoryController"
-           type="compliant_controllers::JointTrajectoryController"
+    <class name="compliant_controllers/JointSapceJointTrajectoryController"
+           type="compliant_controllers::joint_space::JointSpaceJointTrajectoryController"
            base_class_type="controller_interface::ControllerBase">
       <description>
         Joint-space compliant controller with gravity compensation
+      </description>
+    </class>
+    <class name="compliant_controllers/TaskSpaceJointTrajectoryController"
+           type="compliant_controllers::task_space::TaskSpaceJointTrajectoryController"
+           base_class_type="controller_interface::ControllerBase">
+      <description>
+        Task-space compliant controller with gravity compensation
       </description>
     </class>
 </library>

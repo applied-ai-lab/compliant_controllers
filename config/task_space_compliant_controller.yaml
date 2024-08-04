@@ -1,0 +1,11 @@
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 1000
+
+task_space_compliant_controller:
+  type: compliant_controllers/TaskSpaceJointTrajectoryController
+  robot_description_parameter: $(arg robot_description_parameter)
+  end_effector_link: $(arg end_effector_link)
+  joints: [joint_1, joint_2, joint_3,
+    joint_4, joint_5, joint_6, joint_7]
+

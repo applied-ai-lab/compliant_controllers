@@ -1,0 +1,23 @@
+<launch>
+  <arg name="end_effector_link" default="end_effector_link"/>
+  <arg name="robot_description_parameter" default="robot_description"/>
+
+  <!-- Load controller configuration -->
+  <rosparam file="$(find compliant_controllers)/config/task_space_compliant_controller.yaml" command="load" subst_value="true"/>
+
+  <!-- Start joint state and other controllers -->
+  <node name="controller_spawner_started" pkg="controller_manager" type="spawner" respawn="false"
+    output="screen"
+    args="
+      joint_state_controller
+    "/>
+  <node name="compliant_controller_spawner_started" pkg="controller_manager" type="spawner" respawn="false"
+      output="screen"
+      args="
+        --stopped
+        task_space_compliant_controller
+      "/>
+
+  <!-- <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/> -->
+
+</launch>

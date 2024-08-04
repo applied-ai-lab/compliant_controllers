@@ -3,7 +3,7 @@ joint_state_controller:
   publish_rate: 1000
 
 joint_space_compliant_controller:
-  type: compliant_controllers/JointTrajectoryController
+  type: compliant_controllers/JointSpaceJointTrajectoryController
   robot_description_parameter: $(arg robot_description_parameter)
   end_effector_link: $(arg end_effector_link)
   joints: [joint_1, joint_2, joint_3,

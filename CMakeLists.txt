@@ -41,22 +41,34 @@ link_directories(
   ${catkin_LIBRARY_DIRS}
 )
 
-add_library(${PROJECT_NAME}
+# Compiled as two separate libraries to avoid linker error with joint_trajectory_controller internals
+add_library(joint_space_compliant_controller
   src/joint_space/compliant_controllers.cpp
-  src/task_space/compliant_controllers.cpp
-  src/extended_joint_positions.cpp
   src/joint_space/joint_space_compliant_controller.cpp
-  src/task_space/task_space_compliant_controller.cpp
+  src/extended_joint_positions.cpp
   src/utils.cpp
 )
-target_compile_definitions(${PROJECT_NAME} PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
-target_link_libraries(${PROJECT_NAME}
+target_compile_definitions(joint_space_compliant_controller PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
+target_link_libraries(joint_space_compliant_controller
   ${catkin_LIBRARIES}
   pinocchio::pinocchio
 )
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
+add_dependencies(joint_space_compliant_controller ${PROJECT_NAME}_gencfg)
 
-install(TARGETS ${PROJECT_NAME}
+add_library(task_space_compliant_controller
+  src/task_space/compliant_controllers.cpp
+  src/task_space/task_space_compliant_controller.cpp
+  src/extended_joint_positions.cpp
+  src/utils.cpp
+)
+target_compile_definitions(task_space_compliant_controller PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
+target_link_libraries(task_space_compliant_controller
+  ${catkin_LIBRARIES}
+  pinocchio::pinocchio
+)
+add_dependencies(task_space_compliant_controller ${PROJECT_NAME}_gencfg)
+
+install(TARGETS joint_space_compliant_controller task_space_compliant_controller
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

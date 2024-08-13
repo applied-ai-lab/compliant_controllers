@@ -68,6 +68,7 @@ namespace compliant_controllers {
     q_error_max_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
     tempMat3d_ = Eigen::Matrix3d::Zero();
     tempIsometry3d_ = Eigen::Isometry3d::Identity();
+    taskspace_jacobian_ = Eigen::MatrixXd::Zero(6, num_controlled_dofs_);
     return;
   }
 
@@ -210,7 +211,7 @@ namespace compliant_controllers {
     taskspace_error_.head(3) = nominal_ee_transform_.translation() - desired_ee_transform_.translation(); // positional error
 
     // Gravity compensation is performed inside the hardware interface
-    task_effort_.noalias() = taskspace_jacobian_.transpose() * (-task_k_matrix_ * taskspace_error_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
+    task_effort_.noalias() = taskspace_jacobian_.completeOrthogonalDecomposition().pseudoInverse() * (-task_k_matrix_ * taskspace_error_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 
     // Time step smaller than period.toSec() potentially because of too small rotor inertia matrix
     double const step_time {0.001};

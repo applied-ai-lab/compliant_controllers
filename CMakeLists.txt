@@ -4,6 +4,8 @@ project(compliant_controllers)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(BUILD_TESTS ON)
+
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
   driver_base
@@ -82,3 +84,24 @@ install(DIRECTORY config/
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
 )
+
+if(BUILD_TESTS)
+
+  add_library(task_space_compliant_controller_test
+    src/task_space/task_space_compliant_controller.cpp
+    src/extended_joint_positions.cpp
+    src/utils.cpp
+  )
+
+  add_executable(${PROJECT_NAMES}_taskspace_ctrl_test 
+                    test/task_space_control.cpp)
+  
+  target_link_libraries(${PROJECT_NAMES}_taskspace_ctrl_test 
+                          task_space_compliant_controller_test
+                          ${catkin_LIBRARIES}
+                          pinocchio::pinocchio)
+
+  target_compile_definitions(${PROJECT_NAMES}_taskspace_ctrl_test PUBLIC PATH_TO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+endif()
+

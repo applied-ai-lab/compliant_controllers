@@ -93,15 +93,15 @@ if(BUILD_TESTS)
     src/utils.cpp
   )
 
-  add_executable(${PROJECT_NAMES}_taskspace_ctrl_test 
-                    test/task_space_control.cpp)
+  add_executable(${PROJECT_NAME}_taskspace_ctrl_test 
+                    test/test_task_space_control.cpp)
   
-  target_link_libraries(${PROJECT_NAMES}_taskspace_ctrl_test 
+  target_link_libraries(${PROJECT_NAME}_taskspace_ctrl_test 
                           task_space_compliant_controller_test
                           ${catkin_LIBRARIES}
                           pinocchio::pinocchio)
 
-  target_compile_definitions(${PROJECT_NAMES}_taskspace_ctrl_test PUBLIC PATH_TO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  target_compile_definitions(${PROJECT_NAME}_taskspace_ctrl_test PUBLIC PATH_TO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
 endif()
 

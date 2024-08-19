@@ -45,8 +45,19 @@ namespace compliant_controllers {
       int const num_controlled_dofs)
   : robot_model_{std::move(robot_model)}, end_effector_link_{end_effector_link},
     data_{std::make_unique<pinocchio::Data>(*robot_model_.get())},
-    num_controlled_dofs_{num_controlled_dofs},
-    end_effector_index_{robot_model_->getFrameId(end_effector_link)} {
+    num_controlled_dofs_{num_controlled_dofs}
+    {
+
+    // Check to see if end effector link exits in the chain
+    if(!robot_model_->existFrame(end_effector_link))
+    {
+        std::cout << "The end effector link does not exist in the model" << std::endl;
+    }
+    else
+    {
+        end_effector_index_ = robot_model_->getFrameId(end_effector_link);
+    }
+
     setDefaultValues();
     extended_joints_ = std::make_unique<ExtendedJointPositions>(num_controlled_dofs_);
     // TODO: Potentially pre-allocate also other structures
@@ -173,13 +184,15 @@ namespace compliant_controllers {
       last_desired_positions_ = desired_state.positions;
       [[maybe_unused]] bool const is_success {extended_joints_->init(current_state.positions)};
       extended_joints_->update(current_state.positions);
-      nominal_theta_prev_ = extended_joints_->getPositions();
+      // nominal_theta_prev_ = extended_joints_->getPositions();
+      nominal_theta_prev_ = current_state.positions;
       nominal_theta_dot_prev_ = current_state.velocities;
       desired_positions_ = nominal_theta_prev_;
     }
 
     extended_joints_->update(current_state.positions);
-    current_theta_ = extended_joints_->getPositions();
+    current_theta_ = current_state.positions; // extended_joints_->getPositions();
+
     gravity_ = pinocchio::computeGeneralizedGravity(*robot_model_, *data_, joint_ros_to_pinocchio(current_theta_, *robot_model_));
   
     // DESIRED AND NOMINAL TRANSFORMS FOR ERROR PREDICTION
@@ -211,7 +224,7 @@ namespace compliant_controllers {
     taskspace_error_.head(3) = nominal_ee_transform_.translation() - desired_ee_transform_.translation(); // positional error
 
     // Gravity compensation is performed inside the hardware interface
-    task_effort_.noalias() = taskspace_jacobian_.completeOrthogonalDecomposition().pseudoInverse() * (-task_k_matrix_ * taskspace_error_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
+    task_effort_.noalias() = taskspace_jacobian_.completeOrthogonalDecomposition().solve(-task_k_matrix_ * taskspace_error_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 
     // Time step smaller than period.toSec() potentially because of too small rotor inertia matrix
     double const step_time {0.001};
@@ -225,7 +238,7 @@ namespace compliant_controllers {
     nominal_friction_.noalias() = rotor_inertia_matrix_*friction_l_*((nominal_theta_dot_ - current_state.velocities) + 
                         friction_lp_*(nominal_theta_ - current_theta_)
                         + friction_li_ * q_error_sum_);
-
+    
     efforts_ = task_effort_ + nominal_friction_;
 
     nominal_theta_prev_ = nominal_theta_;

@@ -36,11 +36,24 @@ int main(int argc, char **argv)
     desired_state.accelerations.setZero();
     desired_state.efforts.setZero();
 
-    current_state.positions = -0.1 * Eigen::VectorXd::Ones(num_of_dof_);
+    current_state.positions = -0.01 * Eigen::VectorXd::Ones(num_of_dof_);
 
     ros::Duration period(0.01);
     // Compute torque
-    torques = compliant_controller_->computeEffort(desired_state, current_state, period);  
+    int no_runs = 1000;
+
+    auto tic = std::chrono::high_resolution_clock::now();
+
+    for (int k=0; k<no_runs; ++k)
+    {
+        torques = compliant_controller_->computeEffort(desired_state, current_state, period);  
+    }
+
+    auto toc = std::chrono::high_resolution_clock::now();
+    double us_taken = 1e-3 * std::chrono::duration_cast<std::chrono::nanoseconds>(toc - tic).count() / no_runs;
+
+    std::cout << "Average computeEffort run time for " << no_runs << " runs: " <<
+    us_taken << " micro seconds." << std::endl;
 
     std::cout << torques.transpose() << std::endl;
 

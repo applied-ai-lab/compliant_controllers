@@ -51,7 +51,8 @@ namespace compliant_controllers {
     // Check to see if end effector link exits in the chain
     if(!robot_model_->existFrame(end_effector_link))
     {
-        std::cout << "The end effector link does not exist in the model" << std::endl;
+        std::cout << "The end effector link does not exist in the model. Link name: " 
+        << end_effector_link << std::endl;
     }
     else
     {
@@ -127,7 +128,7 @@ namespace compliant_controllers {
   }
 
   bool TaskSpaceCompliantController::setTaskKMatrix(Eigen::MatrixXd const& task_k_matrix) {
-    if (!checkMatrix(task_k_matrix)) {
+    if ((task_k_matrix.rows() != 6) || (task_k_matrix.cols() != 6)) {
       return false;
     }
     task_k_matrix_ = task_k_matrix;
@@ -184,14 +185,14 @@ namespace compliant_controllers {
       last_desired_positions_ = desired_state.positions;
       [[maybe_unused]] bool const is_success {extended_joints_->init(current_state.positions)};
       extended_joints_->update(current_state.positions);
-      // nominal_theta_prev_ = extended_joints_->getPositions();
-      nominal_theta_prev_ = current_state.positions;
+      nominal_theta_prev_ = extended_joints_->getPositions();
+      // nominal_theta_prev_ = current_state.positions;
       nominal_theta_dot_prev_ = current_state.velocities;
-      // desired_positions_ = nominal_theta_prev_;
+      desired_positions_ = nominal_theta_prev_;
     }
 
     extended_joints_->update(current_state.positions);
-    current_theta_ = current_state.positions; // extended_joints_->getPositions();
+    current_theta_ = extended_joints_->getPositions();
 
     gravity_ = pinocchio::computeGeneralizedGravity(*robot_model_, *data_, joint_ros_to_pinocchio(current_theta_, *robot_model_));
   
@@ -224,7 +225,7 @@ namespace compliant_controllers {
     taskspace_error_.head(3) = nominal_ee_transform_.translation() - desired_ee_transform_.translation(); // positional error
 
     // Gravity compensation is performed inside the hardware interface
-    task_effort_.noalias() = taskspace_jacobian_.completeOrthogonalDecomposition().solve(-task_k_matrix_ * taskspace_error_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
+    task_effort_.noalias() = taskspace_jacobian_.transpose() * (-task_k_matrix_ * taskspace_error_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 
     // Time step smaller than period.toSec() potentially because of too small rotor inertia matrix
     double const step_time {0.001};

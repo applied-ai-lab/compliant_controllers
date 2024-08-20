@@ -158,8 +158,8 @@ namespace compliant_controllers {
 
   void TaskSpaceCompliantController::advanceKinematics(Eigen::VectorXd const& q)
   {
-    pinocchio::forwardKinematics(*robot_model_, *data_, joint_ros_to_pinocchio(desired_positions_, *robot_model_));
-    pinocchio::computeJointJacobians(*robot_model_, *data_, joint_ros_to_pinocchio(desired_positions_, *robot_model_));
+    pinocchio::forwardKinematics(*robot_model_, *data_, joint_ros_to_pinocchio(q, *robot_model_));
+    pinocchio::computeJointJacobians(*robot_model_, *data_, joint_ros_to_pinocchio(q, *robot_model_));
     pinocchio::updateFramePlacements(*robot_model_, *data_);
   }
 
@@ -187,7 +187,7 @@ namespace compliant_controllers {
       // nominal_theta_prev_ = extended_joints_->getPositions();
       nominal_theta_prev_ = current_state.positions;
       nominal_theta_dot_prev_ = current_state.velocities;
-      desired_positions_ = nominal_theta_prev_;
+      // desired_positions_ = nominal_theta_prev_;
     }
 
     extended_joints_->update(current_state.positions);

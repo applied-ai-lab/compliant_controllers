@@ -18,6 +18,7 @@
 
 #include <cmath>
 
+#include <iostream>
 #include <Eigen/Eigen>
 
 
@@ -47,6 +48,11 @@ namespace compliant_controllers {
     for (Eigen::Index i = 0; i < target_joint_positions.size(); ++i) {
       if (std::abs(target_joint_positions(i) - current_joint_positions_(i)) >= threshold_) {
         diff_joint_positions_(i) += normalize(target_joint_positions(i)) - normalize(current_joint_positions_(i));
+        // std::cout << "========================" << std::endl;
+        // std::cout << " BRANCH 1 IN UPDATE JOINT POSITIONS: " << i << ", " << target_joint_positions(i) << ", " << current_joint_positions_(i) << std::endl;
+        // std::cout << diff_joint_positions_(i) << std::endl;
+        // std::cout << "========================" << std::endl;
+        
       } else {
         // TODO: Verify that the following implementation is actually correct
         // It does not seem correct to me!

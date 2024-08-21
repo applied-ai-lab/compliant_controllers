@@ -73,6 +73,7 @@ namespace compliant_controllers {
     friction_l_ = constructDiagonalMatrix(60, num_controlled_dofs_);
     friction_lp_ = constructDiagonalMatrix(4, num_controlled_dofs_);
     friction_li_ = constructDiagonalMatrix(0, num_controlled_dofs_);
+    joint_k_matrix_ = constructDiagonalMatrix(1, num_controlled_dofs_);
     task_k_matrix_ = constructDiagonalMatrix(10, 6);
     joint_d_matrix_ = constructDiagonalMatrix(2, num_controlled_dofs_);
     q_error_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
@@ -132,6 +133,15 @@ namespace compliant_controllers {
       return false;
     }
     task_k_matrix_ = task_k_matrix;
+    return true;
+  }
+
+  bool TaskSpaceCompliantController::setJointKMatrix(Eigen::MatrixXd const& joint_k_matrix) {
+    if (!checkMatrix(joint_k_matrix)) {
+      std::cout << "Failed to set joint k matrix" << std::endl; 
+      return false;
+    }
+    joint_k_matrix_ = joint_k_matrix;
     return true;
   }
 
@@ -225,7 +235,9 @@ namespace compliant_controllers {
     taskspace_error_.head(3) = nominal_ee_transform_.translation() - desired_ee_transform_.translation(); // positional error
 
     // Gravity compensation is performed inside the hardware interface
-    task_effort_.noalias() = taskspace_jacobian_.transpose() * (-task_k_matrix_ * taskspace_error_) - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
+    task_effort_.noalias() = taskspace_jacobian_.transpose() * (-task_k_matrix_ * taskspace_error_) 
+                             - joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_)
+                             - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 
     // Time step smaller than period.toSec() potentially because of too small rotor inertia matrix
     double const step_time {0.001};

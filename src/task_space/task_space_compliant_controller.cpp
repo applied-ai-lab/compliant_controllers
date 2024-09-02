@@ -81,7 +81,7 @@ namespace compliant_controllers {
     q_error_max_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
     tempMat3d_ = Eigen::Matrix3d::Zero();
     tempIsometry3d_ = Eigen::Isometry3d::Identity();
-    taskspace_jacobian_ = Eigen::MatrixXd::Zero(6, num_controlled_dofs_);
+    jacobian_ = Eigen::MatrixXd::Zero(6, robot_model_->nv);
     return;
   }
 
@@ -216,7 +216,7 @@ namespace compliant_controllers {
     nominal_ee_transform_ = getFrameTransform(nominal_theta_prev_, end_effector_index_);
     nominal_ee_quat_ = Eigen::Quaterniond(nominal_ee_transform_.linear());
 
-    pinocchio::getFrameJacobian(*robot_model_, *data_, end_effector_index_, pinocchio::LOCAL_WORLD_ALIGNED, taskspace_jacobian_);
+    pinocchio::getFrameJacobian(*robot_model_, *data_, end_effector_index_, pinocchio::LOCAL_WORLD_ALIGNED, jacobian_);
     
     // Reorientate quat if needed
     if (desired_ee_quat_.coeffs().dot(nominal_ee_quat_.coeffs()) < 0.0)
@@ -235,7 +235,8 @@ namespace compliant_controllers {
     taskspace_error_.head(3) = nominal_ee_transform_.translation() - desired_ee_transform_.translation(); // positional error
 
     // Gravity compensation is performed inside the hardware interface
-    task_effort_.noalias() = taskspace_jacobian_.transpose() * (-task_k_matrix_ * taskspace_error_) 
+    // The jacobian includes derivatives for the gripper which does not affect the manipulator so these are ignored
+    task_effort_.noalias() = jacobian_.block(0, 0, 6, num_controlled_dofs_).transpose() * (-task_k_matrix_ * taskspace_error_) 
                              - joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_)
                              - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 

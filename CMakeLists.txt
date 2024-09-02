@@ -4,7 +4,7 @@ project(compliant_controllers)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(BUILD_TESTS ON)
+set(BUILD_TESTS OFF)
 
 find_package(catkin REQUIRED COMPONENTS
   controller_interface

@@ -9,7 +9,7 @@
 int main(int argc, char **argv)
 {
 
-    std::string robot_description = PATH_TO_DIR + std::string("/test/urdf/oxf20_right_arm.urdf");
+    std::string robot_description = PATH_TO_DIR + std::string("/test/urdf/oxf20_right_arm_gripper.urdf");
 
     auto robot_model = std::make_unique<pinocchio::Model>();
     pinocchio::urdf::buildModel(robot_description, *robot_model.get());
@@ -36,7 +36,7 @@ int main(int argc, char **argv)
     desired_state.accelerations.setZero();
     desired_state.efforts.setZero();
 
-    current_state.positions = -0.01 * Eigen::VectorXd::Ones(num_of_dof_);
+    current_state.positions = 0.01 * Eigen::VectorXd::Ones(num_of_dof_);
 
     ros::Duration period(0.01);
     // Compute torque

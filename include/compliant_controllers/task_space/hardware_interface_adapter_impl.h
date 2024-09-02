@@ -197,6 +197,13 @@ namespace compliant_controllers {
         task_k_matrix.block(0, 0, 6, 6)
       );
 
+      Eigen::MatrixXd task_d_matrix {Eigen::MatrixXd::Zero(6,6)};
+      task_d_matrix.diagonal() << config.d_0, config.d_1, config.d_2,
+                                  config.d_3, config.d_4, config.d_5;
+      is_success = compliant_controller_->setTaskKMatrix(
+        task_d_matrix.block(0, 0, 6, 6)
+      );
+
       Eigen::MatrixXd joint_k_matrix {Eigen::MatrixXd::Zero(7, 7)};
       joint_k_matrix.diagonal() << config.jk_0, config.jk_1, config.jk_2,
                                    config.jk_3, config.jk_4, config.jk_5, config.jk_6;
@@ -205,8 +212,8 @@ namespace compliant_controllers {
       );
 
       Eigen::MatrixXd joint_d_matrix {Eigen::MatrixXd::Zero(7,7)};
-      joint_d_matrix.diagonal() << config.d_0, config.d_1, config.d_2,
-                                  config.d_3, config.d_4, config.d_5, config.d_6;
+      joint_d_matrix.diagonal() << config.jd_0, config.jd_1, config.jd_2,
+                                  config.jd_3, config.jd_4, config.jd_5, config.jd_6;
       is_success = compliant_controller_->setJointDMatrix(
         joint_d_matrix.block(0, 0, num_of_dof_, num_of_dof_)
       );

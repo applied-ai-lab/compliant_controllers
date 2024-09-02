@@ -130,15 +130,27 @@ namespace compliant_controllers {
 
       /**\fn setTaskKMatrix
        * \brief
-       *   Set the joint compliance proportional gain matrix
+       *   Set the task space compliance proportional gain matrix
        * 
-       * \param[in] joint_k_matrix
-       *   The joint compliance proportional gain matrix to be set
+       * \param[in] task_k_matrix
+       *   The task space compliance proportional gain matrix to be set
        * \return
        *   Boolean variable signalling success or failure
       */
       [[nodiscard]]
       bool setTaskKMatrix(Eigen::MatrixXd const& task_k_matrix);
+
+      /**\fn setTaskdMatrix
+       * \brief
+       *   Set the task compliance derivative gain matrix
+       * 
+       * \param[in] joint_d_matrix
+       *   The task space compliance proportional gain matrix to be set
+       * \return
+       *   Boolean variable signalling success or failure
+      */
+      [[nodiscard]]
+      bool setTaskDMatrix(Eigen::MatrixXd const& task_d_matrix);
 
       /**\fn setJointKMatrix
        * \brief
@@ -263,9 +275,10 @@ namespace compliant_controllers {
       Eigen::MatrixXd friction_li_;           // Integral friction observer gain
       // Joint space k matrix
       Eigen::MatrixXd joint_k_matrix_;
+      Eigen::MatrixXd joint_d_matrix_;
       // Task space k matrix
       Eigen::MatrixXd task_k_matrix_;
-      Eigen::MatrixXd joint_d_matrix_;
+      Eigen::MatrixXd task_d_matrix_;
       // Integrator quantities
       Eigen::VectorXd q_error_;
       Eigen::VectorXd q_error_sum_;
@@ -275,8 +288,8 @@ namespace compliant_controllers {
 
       // Task-space deltas
       Eigen::Matrix<double, 6, 1> taskspace_error_;
-      Eigen::MatrixXd taskspace_jacobian_;
-      // Eigen::MatrixXd taskspace_jacobian_pinv_;
+      // The jacobian of the complete robot model including gripper
+      Eigen::MatrixXd jacobian_;
       Eigen::Isometry3d nominal_ee_transform_;
       Eigen::Quaterniond nominal_ee_quat_;
       Eigen::Isometry3d desired_ee_transform_; 

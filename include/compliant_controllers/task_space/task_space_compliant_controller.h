@@ -275,8 +275,8 @@ namespace compliant_controllers {
 
       // Task-space deltas
       Eigen::Matrix<double, 6, 1> taskspace_error_;
-      Eigen::MatrixXd taskspace_jacobian_;
-      // Eigen::MatrixXd taskspace_jacobian_pinv_;
+      // The jacobian of the complete robot model including gripper
+      Eigen::MatrixXd jacobian_;
       Eigen::Isometry3d nominal_ee_transform_;
       Eigen::Quaterniond nominal_ee_quat_;
       Eigen::Isometry3d desired_ee_transform_; 

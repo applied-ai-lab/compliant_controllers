@@ -75,6 +75,7 @@ namespace compliant_controllers {
     friction_li_ = constructDiagonalMatrix(0, num_controlled_dofs_);
     joint_k_matrix_ = constructDiagonalMatrix(1, num_controlled_dofs_);
     task_k_matrix_ = constructDiagonalMatrix(10, 6);
+    task_d_matrix_ = constructDiagonalMatrix(0.1, 6);
     joint_d_matrix_ = constructDiagonalMatrix(2, num_controlled_dofs_);
     q_error_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
     q_error_sum_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
@@ -133,6 +134,15 @@ namespace compliant_controllers {
       return false;
     }
     task_k_matrix_ = task_k_matrix;
+    return true;
+  }
+
+  bool TaskSpaceCompliantController::setTaskDMatrix(Eigen::MatrixXd const& task_d_matrix)
+  {
+    if ((task_d_matrix.rows() != 6) || (task_d_matrix.cols() != 6)) {
+      return false;
+    }
+    task_d_matrix_ = task_d_matrix;
     return true;
   }
 
@@ -236,7 +246,8 @@ namespace compliant_controllers {
 
     // Gravity compensation is performed inside the hardware interface
     // The jacobian includes derivatives for the gripper which does not affect the manipulator so these are ignored
-    task_effort_.noalias() = jacobian_.block(0, 0, 6, num_controlled_dofs_).transpose() * (-task_k_matrix_ * taskspace_error_) 
+    task_effort_.noalias() = jacobian_.block(0, 0, 6, num_controlled_dofs_).transpose() * (-task_k_matrix_ * taskspace_error_ 
+                                                                                           -task_d_matrix_ * jacobian_.block(0, 0, 6, num_controlled_dofs_) * (nominal_theta_dot_prev_ - desired_state.velocities))
                              - joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_)
                              - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 

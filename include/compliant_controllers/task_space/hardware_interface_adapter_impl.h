@@ -200,7 +200,7 @@ namespace compliant_controllers {
       Eigen::MatrixXd task_d_matrix {Eigen::MatrixXd::Zero(6,6)};
       task_d_matrix.diagonal() << config.d_0, config.d_1, config.d_2,
                                   config.d_3, config.d_4, config.d_5;
-      is_success = compliant_controller_->setTaskKMatrix(
+      is_success = compliant_controller_->setTaskDMatrix(
         task_d_matrix.block(0, 0, 6, 6)
       );
 

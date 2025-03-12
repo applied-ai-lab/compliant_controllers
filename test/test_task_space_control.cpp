@@ -2,7 +2,7 @@
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
 
-#include "compliant_controllers/task_space/task_space_compliant_controller.h"
+#include "compliant_controllers/joint_task_space/controller.h"
 
 
 
@@ -19,7 +19,7 @@ int main(int argc, char **argv)
 
     Eigen::VectorXd torques = Eigen::VectorXd::Zero(num_of_dof_);
 
-    auto compliant_controller_ = std::make_unique<compliant_controllers::TaskSpaceCompliantController>(std::move(robot_model), end_effector_link, num_of_dof_);
+    auto compliant_controller_ = std::make_unique<compliant_controllers::joint_task_space::CompliantController>(std::move(robot_model), end_effector_link, num_of_dof_);
     
 
     // Create the current and desired robot states

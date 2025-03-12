@@ -4,7 +4,7 @@ project(compliant_controllers)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(BUILD_TESTS OFF)
+set(BUILD_TESTS ON)
 
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
@@ -19,6 +19,7 @@ find_package(pinocchio REQUIRED)
 
 generate_dynamic_reconfigure_options(
   config/JointSpaceParams.cfg
+  config/JointTaskSpaceParams.cfg
   config/TaskSpaceParams.cfg
 )
 
@@ -43,7 +44,7 @@ link_directories(
   ${catkin_LIBRARY_DIRS}
 )
 
-# Compiled as two separate libraries to avoid linker error with joint_trajectory_controller internals
+# Compiled as three separate libraries to avoid linker error with joint_trajectory_controller internals
 add_library(joint_space_compliant_controller
   src/joint_space/compliant_controllers.cpp
   src/joint_space/joint_space_compliant_controller.cpp
@@ -56,6 +57,19 @@ target_link_libraries(joint_space_compliant_controller
   pinocchio::pinocchio
 )
 add_dependencies(joint_space_compliant_controller ${PROJECT_NAME}_gencfg)
+
+add_library(joint_task_space_compliant_controller
+  src/joint_task_space/compliant_controllers.cpp
+  src/joint_task_space/controller.cpp
+  src/extended_joint_positions.cpp
+  src/utils.cpp
+)
+target_compile_definitions(joint_task_space_compliant_controller PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
+target_link_libraries(joint_task_space_compliant_controller
+  ${catkin_LIBRARIES}
+  pinocchio::pinocchio
+)
+add_dependencies(joint_task_space_compliant_controller ${PROJECT_NAME}_gencfg)
 
 add_library(task_space_compliant_controller
   src/task_space/compliant_controllers.cpp
@@ -70,7 +84,7 @@ target_link_libraries(task_space_compliant_controller
 )
 add_dependencies(task_space_compliant_controller ${PROJECT_NAME}_gencfg)
 
-install(TARGETS joint_space_compliant_controller task_space_compliant_controller
+install(TARGETS joint_space_compliant_controller joint_task_space_compliant_controller task_space_compliant_controller
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -87,21 +101,21 @@ install(DIRECTORY launch/
 
 if(BUILD_TESTS)
 
-  add_library(task_space_compliant_controller_test
-    src/task_space/task_space_compliant_controller.cpp
+  add_library(joint_task_space_compliant_controller_test
+    src/joint_task_space/controller.cpp
     src/extended_joint_positions.cpp
     src/utils.cpp
   )
 
-  add_executable(${PROJECT_NAME}_taskspace_ctrl_test 
+  add_executable(${PROJECT_NAME}_joint_taskspace_ctrl_test 
                     test/test_task_space_control.cpp)
   
-  target_link_libraries(${PROJECT_NAME}_taskspace_ctrl_test 
-                          task_space_compliant_controller_test
+  target_link_libraries(${PROJECT_NAME}_joint_taskspace_ctrl_test 
+                          joint_task_space_compliant_controller_test
                           ${catkin_LIBRARIES}
                           pinocchio::pinocchio)
 
-  target_compile_definitions(${PROJECT_NAME}_taskspace_ctrl_test PUBLIC PATH_TO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  target_compile_definitions(${PROJECT_NAME}_joint_taskspace_ctrl_test PUBLIC PATH_TO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
 endif()
 

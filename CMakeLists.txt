@@ -35,6 +35,12 @@ catkin_package(
 )
 find_package(Eigen3 REQUIRED)
 
+catkin_install_python(PROGRAMS
+    scripts/switch_mode.py
+    scripts/test_controller_server.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}

@@ -1,0 +1,33 @@
+TaskKp:
+  task_k_0: 1000
+  task_k_1: 1000
+  task_k_2: 650
+  task_k_3: 45
+  task_k_4: 25
+  task_k_5: 25
+
+TaskKd:
+  task_d_0: 4.6
+  task_d_1: 4.6
+  task_d_2: 4.6
+  task_d_3: 2.0
+  task_d_4: 2.0
+  task_d_5: 2.0
+
+JointKp:
+  joint_k_0: 0.0
+  joint_k_1: 0.0
+  joint_k_2: 0.0
+  joint_k_3: 0.0
+  joint_k_4: 0.0
+  joint_k_5: 0.0
+  joint_k_6: 0.0
+
+JointKd:
+  joint_d_0: 1.0
+  joint_d_1: 1.0
+  joint_d_2: 1.0
+  joint_d_3: 1.0
+  joint_d_4: 1.0
+  joint_d_5: 1.0
+  joint_d_6: 1.0

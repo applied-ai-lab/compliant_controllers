@@ -32,7 +32,7 @@
 #include <ros/ros.h>
 
 #include "compliant_controllers/JointSpaceCompliantControllerConfig.h"
-#include "compliant_controllers/joint_space/joint_space_compliant_controller.h"
+#include "compliant_controllers/joint_space/controller.h"
 #include "compliant_controllers/robot_state.h"
 
 
@@ -77,7 +77,7 @@ namespace compliant_controllers {
       command_effort_.resize(num_of_dof_);
 
       // TODO: This should be templated so that we can switch between the joint and task space implementations easily
-      compliant_controller_ = std::make_unique<JointSpaceCompliantController>(std::move(robot_model), end_effector_link, num_of_dof_);
+      compliant_controller_ = std::make_unique<CompliantController>(std::move(robot_model), end_effector_link, num_of_dof_);
 
       using namespace boost::placeholders;
       dynamic_reconfigure_callback_ = boost::bind(&CompliantHardwareInterfaceAdapter::dynamicReconfigureCallback, this, _1, _2);

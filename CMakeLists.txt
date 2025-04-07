@@ -53,7 +53,7 @@ link_directories(
 # Compiled as three separate libraries to avoid linker error with joint_trajectory_controller internals
 add_library(joint_space_compliant_controller
   src/joint_space/compliant_controllers.cpp
-  src/joint_space/joint_space_compliant_controller.cpp
+  src/joint_space/controller.cpp
   src/extended_joint_positions.cpp
   src/utils.cpp
 )

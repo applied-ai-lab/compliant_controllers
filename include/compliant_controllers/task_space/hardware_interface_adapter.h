@@ -30,7 +30,7 @@
 #include <ros/ros.h>
 
 #include "compliant_controllers/TaskSpaceCompliantControllerConfig.h"
-#include "compliant_controllers/task_space/task_space_compliant_controller.h"
+#include "compliant_controllers/task_space/controller.h"
 #include "compliant_controllers/robot_state.h"
 
 
@@ -127,7 +127,7 @@ namespace compliant_controllers {
           uint32_t const level);
 
         std::vector<hardware_interface::JointHandle>* joint_handles_ptr_;
-        std::unique_ptr<TaskSpaceCompliantController> compliant_controller_;
+        std::unique_ptr<CompliantController> compliant_controller_;
         bool execute_default_command_;
         std::size_t num_of_dof_;
         RobotState desired_state_;

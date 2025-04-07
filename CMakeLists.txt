@@ -79,7 +79,7 @@ add_dependencies(joint_task_space_compliant_controller ${PROJECT_NAME}_gencfg)
 
 add_library(task_space_compliant_controller
   src/task_space/compliant_controllers.cpp
-  src/task_space/task_space_compliant_controller.cpp
+  src/task_space/controller.cpp
   src/extended_joint_positions.cpp
   src/utils.cpp
 )

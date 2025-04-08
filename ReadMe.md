@@ -1,6 +1,6 @@
 # Compliant controllers
 
-Authors: [Tobit Flatscher](https://github.com/2b-t) [Alexander Mitchell](https://github.com/mitch722) (2024-25)
+Authors: [Tobit Flatscher](https://github.com/2b-t), [Alexander Mitchell](https://github.com/mitch722) (2024-25)
 
 
 
@@ -97,7 +97,7 @@ https://github.com/applied-ai-lab/compliant_controllers/blob/feat/joint-task-com
 and
 https://github.com/applied-ai-lab/compliant_controllers/blob/feat/joint-task-combo/src/<MODE>/controller.cpp
 ```
-where the <MODE> is the controller type e.g. (joint_task_space, joint, task).
+where the **MODE** is the controller type e.g. (joint_task_space, joint, task).
 
 ## Known issues
 

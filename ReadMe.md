@@ -10,7 +10,20 @@ Currently this package only supports robotic arms with revolute and no prismatic
 
 We include a video of some of the capabilities of the controller below.
 
-https://github.com/user-attachments/assets/1e28ed50-c71a-445d-b1df-f9298bf9e8a9
+
+
+https://github.com/user-attachments/assets/e4ac66bf-fd5c-49f5-9200-dfaccc717041
+
+
+The video above shows the joint-, task- and joint and task-space control modes. The joint and task-space mode is default. It is possible to vary the gains of the joint and task space controller so that it becomes either a task or joint space controller only using dynamic reconfigure. 
+
+The controller can be used for pin insertion and for replanning in the event of human interaction as is shown in the video below:
+
+https://github.com/user-attachments/assets/611a5bd9-6b1f-4e88-bd31-5ce5a897ff2d
+
+
+
+
 
 ## Running
 

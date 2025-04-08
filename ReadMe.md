@@ -1,37 +1,30 @@
 # Compliant controllers
 
-Author: [Tobit Flatscher](https://github.com/2b-t) (2024)
+Authors: [Tobit Flatscher](https://github.com/2b-t) [Alexander Mitchell](https://github.com/mitch722) (2024-25)
 
 
 
-This package contains a **compliant controller for robotic arms in ROS Noetic** based on the [`gen3_compliant_controllers`](https://github.com/empriselab/gen3_compliant_controllers) repository but wrapping it as a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller) that performs interpolation in between different set-points and can be used in combination with [MoveIt](https://moveit.ros.org/install/). For this purpose the code base has been largely rewritten.
+This package contains a **compliant controller for robotic arms in ROS Noetic** and extends on the [`gen3_compliant_controllers`](https://github.com/empriselab/gen3_compliant_controllers) repository and wraps it as a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller) that performs interpolation in between different set-points. This means that the controller can be used in combination with [MoveIt](https://moveit.ros.org/install/). As a result of wrapping the controller as JointTrajectoryController, this code base has been largely rewritten in comparison to gen3_compliant_controllers.
 
 Currently this package only supports robotic arms with revolute and no prismatic joints.
 
+We include a video of some of the capabilities of the controller below.
 
+https://github.com/user-attachments/assets/1e28ed50-c71a-445d-b1df-f9298bf9e8a9
 
 ## Running
 
 ### Running on the hardware
 
-This code must be used in combination with the **`kortex_hardware` hardware interface** (see [here](https://github.com/empriselab/kortex_hardware) for the installation instructions) as the hardware interface implements torque filtering as well as gravity compensation.
+This code must be used in combination with the **`kortex_hardware` hardware interface** (see [here](https://github.com/applied-ai-lab/kortex_hardware) for the installation instructions) as the hardware interface implements torque filtering as well as **gravity compensation**.
 
-You will have to run the `kortex_hardware` hardware interface as well as this controller.
+You will have to run the `kortex_hardware` hardware interface as well as this controller. The hardware interface launches in effort mode by default, meaning that the controller can be started.
 
-**Before activating the controller** (switching it to `running`) make sure to **switch the hardware interface into effort mode** by calling the corresponding service that the hardware interface exposes:
-
-```bash
-$ rosservice call /my_gen3/set_control_mode "mode: 'effort'"
-```
-
-In case you first activated the controller without activating the effort mode the friction compensation contribution continues to rise and outweigh the task effort. This will result in the hardware interface bailing out and the robot arm going into a failure mode that has to be reset.
-
-**Only after** having switched the hardware interface to `effort` mode, proceed to activate the controller by opening the `rqt_controller_manager` GUI, selecting the controller and switching it to `running`:
+Proceed to activate the controller by opening the `rqt_controller_manager` GUI, selecting the controller and switching it to `running`:
 
 ```bash
 $ rosrun rqt_controller_manager rqt_controller_manager
 ```
-
 
 
 ### Running in simulation
@@ -71,11 +64,15 @@ Choose the corresponding controller manager, select the desired joint trajectory
 
 ## Sending Smooth Trajecotories and Replanning
 
-As mentioned, this controller is a compliant controller wrapping a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller). You can send a **sparse** trajectory to this controller and the controller will interpolate between the points. Additionally, it is possible to send a new trajectory to the controller and it will **replace** the previous plan and interpolate between the current motion and the new trajectory. This permits continuous replanning currently tested at ~10Hz.
+As mentioned, this controller is a compliant controller wrapping a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller). You can stream a set point message or a **sparse** trajectory, which is a list of set points. When a single set point is sent to the controller, this will be the input to the control algorithm. Alternatively, the controller will interpolate between the current robot motion and the input trajectory. This is explained in more detail in the subsections below.
 
-### Replanning Tips
+### Streaming Joint Trajectory Points
 
-Documentation on replanning with the trajectory follower controller is found [`here`](https://wiki.ros.org/joint_trajectory_controller/UnderstandingTrajectoryReplacement).
+Streaming single [`JointTrajectoryPoint`](https://docs.ros.org/en/noetic/api/trajectory_msgs/html/msg/JointTrajectoryPoint.html) at high frequency works well for closed-loop replanning and tele-operation. This is achieved by publishing [`JointTrajectoryPoint`](https://docs.ros.org/en/noetic/api/trajectory_msgs/html/msg/JointTrajectoryPoint.html) to the [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller) topic.
+
+### Sending Joint Trajectories
+
+Sending a [`trajectory of set points`](https://docs.ros.org/en/noetic/api/trajectory_msgs/html/msg/JointTrajectory.html) to the `JointTrajectoryController's`](http://wiki.ros.org/joint_trajectory_controller) action server, triggers the controller to interpolate between the robot's current motion and the new trajectory. Documentation on replanning with the trajectory follower controller is found [`here`](https://wiki.ros.org/joint_trajectory_controller/UnderstandingTrajectoryReplacement).
 
 The controller interpolates between trajectories using splines of varying order. See the table below for more details:
 
@@ -90,6 +87,17 @@ The trajectory follower fits a spline starting at the *current* joint positions,
 
 Furthermore, do not send a new trajectory with a set point at the current joint state. For example, if you are at timestep t, do not send a pose for this timestep, but send the set point for t + 1 as the initial or only pose. The trajectory follower will interpolate from its own states at t and find a smooth path to the set point at t + 1. See Figure 2 in [`UnderstaningJointTrajectoryReplacement`](https://wiki.ros.org/joint_trajectory_controller/UnderstandingTrajectoryReplacement) for an example of this.
    
+
+## Code Breakdown
+
+The algorithms and ROS control architecture are written in separate files. The non-ROS parts algorithms are found in
+
+```bash
+https://github.com/applied-ai-lab/compliant_controllers/blob/feat/joint-task-combo/include/compliant_controllers/<MODE>/controller.h
+and
+https://github.com/applied-ai-lab/compliant_controllers/blob/feat/joint-task-combo/src/<MODE>/controller.cpp
+```
+where the <MODE> is the controller type e.g. (joint_task_space, joint, task).
 
 ## Known issues
 

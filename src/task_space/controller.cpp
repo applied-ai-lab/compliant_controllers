@@ -43,10 +43,10 @@ namespace compliant_controllers {
 
     CompliantController::CompliantController(
         std::unique_ptr<pinocchio::Model> robot_model, std::string const& end_effector_link,
-        int const num_controlled_dofs)
+        int const num_controlled_dofs, bool apply_gravity)
     : robot_model_{std::move(robot_model)}, end_effector_link_{end_effector_link},
       data_{std::make_unique<pinocchio::Data>(*robot_model_.get())},
-      num_controlled_dofs_{num_controlled_dofs}
+      num_controlled_dofs_{num_controlled_dofs}, apply_gravity_{apply_gravity}
       {
 
       // Check to see if end effector link exits in the chain
@@ -265,6 +265,9 @@ namespace compliant_controllers {
                           + friction_li_ * q_error_sum_);
       
       efforts_ = task_effort_ + nominal_friction_;
+
+      // Apply gravity compensation if required
+      if (apply_gravity_) { efforts_ += gravity_; }
 
       nominal_theta_prev_ = nominal_theta_;
       nominal_theta_dot_prev_ = nominal_theta_dot_;

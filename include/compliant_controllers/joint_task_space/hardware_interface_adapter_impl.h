@@ -71,6 +71,11 @@ namespace compliant_controllers {
         ROS_ERROR_STREAM("Failed to get robot end effector link!");
         return false;
       }
+      bool apply_gravity;
+      if (!controller_nh.getParam("apply_gravity_compensation", apply_gravity)) {
+        ROS_ERROR_STREAM("Failed to get apply gravity compensation parameter!");
+        return false;
+      }
 
       num_of_dof_ = joint_handles_ptr_->size();
       desired_state_ = RobotState(num_of_dof_);
@@ -78,7 +83,7 @@ namespace compliant_controllers {
       command_effort_.resize(num_of_dof_);
 
       // TODO: This should be templated so that we can switch between the joint and task space implementations easily
-      compliant_controller_ = std::make_unique<CompliantController>(std::move(robot_model), end_effector_link, num_of_dof_);
+      compliant_controller_ = std::make_unique<CompliantController>(std::move(robot_model), end_effector_link, num_of_dof_, apply_gravity);
 
       using namespace boost::placeholders;
       dynamic_reconfigure_callback_ = boost::bind(&CompliantHardwareInterfaceAdapter::dynamicReconfigureCallback, this, _1, _2);

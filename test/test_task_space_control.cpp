@@ -17,9 +17,11 @@ int main(int argc, char **argv)
     int num_of_dof_ = 7;
     std::string end_effector_link = "right_kinova_arm_tool_frame";
 
+    bool apply_gravity = true;
+
     Eigen::VectorXd torques = Eigen::VectorXd::Zero(num_of_dof_);
 
-    auto compliant_controller_ = std::make_unique<compliant_controllers::joint_task_space::CompliantController>(std::move(robot_model), end_effector_link, num_of_dof_);
+    auto compliant_controller_ = std::make_unique<compliant_controllers::joint_task_space::CompliantController>(std::move(robot_model), end_effector_link, num_of_dof_, apply_gravity);
     
 
     // Create the current and desired robot states

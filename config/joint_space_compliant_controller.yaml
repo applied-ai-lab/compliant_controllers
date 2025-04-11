@@ -6,6 +6,7 @@ joint_space_compliant_controller:
   type: compliant_controllers/JointSpaceJointTrajectoryController
   robot_description_parameter: $(arg robot_description_parameter)
   end_effector_link: $(arg end_effector_link)
+  apply_gravity_compensation: $(arg apply_gravity_compensation)
   joints: [joint_1, joint_2, joint_3,
     joint_4, joint_5, joint_6, joint_7]
 

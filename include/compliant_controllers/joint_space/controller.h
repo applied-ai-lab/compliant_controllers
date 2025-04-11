@@ -53,10 +53,13 @@ namespace compliant_controllers {
          *   The end-effector link of the kinematic chain
          * \param[in] num_controlled_dofs
          *   The number of degree of freedoms that the controller should control
+         * \param[in] apply_gravity
+         *   Toggle whether to add gravity compensatin to efforts_ during computeEffort
         */
         CompliantController(std::unique_ptr<pinocchio::Model> robot_model,
                                       std::string const& end_effector_link,
-                                      int const num_controlled_dofs);
+                                      int const num_controlled_dofs,
+                                      bool apply_gravity);
         CompliantController() = delete;
         CompliantController(CompliantController const&) = default;
         CompliantController& operator= (CompliantController const&) = default;
@@ -234,6 +237,7 @@ namespace compliant_controllers {
         [[nodiscard]]
         bool checkMatrix(Eigen::MatrixXd const& matrix) const noexcept;
 
+        bool apply_gravity_;
         std::unique_ptr<pinocchio::Model> robot_model_;
         std::string end_effector_link_;
         std::unique_ptr<pinocchio::Data> data_;

@@ -5,7 +5,6 @@ Authors: [Tobit Flatscher](https://github.com/2b-t), [Alexander Mitchell](https:
 
 
 This package contains a **compliant controller for robotic arms in ROS Noetic** and extends on the [`gen3_compliant_controllers`](https://github.com/empriselab/gen3_compliant_controllers) repository and wraps it as a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller) that performs interpolation in between different set-points. This means that the controller can be used in combination with [MoveIt](https://moveit.ros.org/install/). As a result of wrapping the controller as JointTrajectoryController, this code base has been largely rewritten in comparison to gen3_compliant_controllers.
-
 Currently this package only supports robotic arms with revolute and no prismatic joints.
 
 We include a video of some of the capabilities of the controller below.
@@ -25,11 +24,11 @@ https://github.com/user-attachments/assets/611a5bd9-6b1f-4e88-bd31-5ce5a897ff2d
 
 
 
-## Running
+## Usage
 
 ### Running on the hardware
 
-This code must be used in combination with the **`kortex_hardware` hardware interface** (see [here](https://github.com/applied-ai-lab/kortex_hardware) for the installation instructions) as the hardware interface implements torque filtering as well as **gravity compensation**.
+This code must be used in combination with the **`kortex_hardware` hardware interface** (see [here](https://github.com/applied-ai-lab/kortex_hardware) for the installation instructions) as the hardware interface implements torque filtering as well as **gravity compensation**. The 
 
 You will have to run the `kortex_hardware` hardware interface as well as this controller. The hardware interface launches in effort mode by default, meaning that the controller can be started.
 
@@ -117,12 +116,6 @@ where the **MODE** is the controller type e.g. (joint_task_space, joint, task).
 This package has a few limitations mostly stemming from its initial implementation. We will try to resolve these over time.
 
 - The controller **time step** is **hard-coded** into the controller, setting it to an actual realistic time does not seem to work.
-- As outlined before the **friction observer** might lead to a significantly higher effort than the task effort if the hardware interface is not switched to `effort` and might trigger the emergency stop as a consequence. Ideally the effort **should be clipped** or be clippable in one of the configuration files.
 - Running the simulation currently requires modifications to the `ros_controllers` repository to run in **simulation**. A template argument has to be added to the `JointTrajectoryController` with the default value `HardwareInterfaceAdapter` to the `JointTrajectoryController`: `template <class SegmentImpl, class HardwareInterface, template <class HW, class S> class Adapter = HardwareInterfaceAdapter> class JointTrajectoryController` (see [here](https://github.com/ros-controls/ros_controllers/blob/678b92adfd9242c93b78c066a8369c7665ea1421/joint_trajectory_controller/include/joint_trajectory_controller/joint_trajectory_controller.h#L178))  and the joint trajectory controller in this repository has to call this `CompliantHardwareInterface` instead. Otherwise the code will run into a **segmentation fault inside Gazebo**.
-- The **controller and hardware interface** are **tightly integrated**. This is not very desirable as there is no clear separation of functionality (controller vs hardware interface) and forces its users to use this particular combination. Furthermore this results in problems with simulation as mentioned before.
 - Currently dynamic reconfigure does not support variable size arrays. For this reason we implemented dynamic reconfigure for a fixed size list of parameters holding sufficient parameters for most traditional robotic arms (7). In case the robot does not have the corresponding joints, the last additional degrees of freedom will not be used.
-- A task-space compliant controller could be created by porting the corresponding controller from the initial repository.
-- The actual control part currently is extracted into a single file. This would allow us to test the controller independently with unit tests. Currently this is not easily possible due to the tight integration of hardware interface (which does filtering and gravity compensation). One could e.g.
-  - Test that the controller controlling a robot in an upright position that should stay in that position does not generate a substantial force.
-  - Similarly we could make sure that a generated effort points into the right direction and is within reasonable bounds.
 

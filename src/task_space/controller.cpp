@@ -74,7 +74,6 @@ namespace compliant_controllers {
       friction_l_ = constructDiagonalMatrix(60, num_controlled_dofs_);
       friction_lp_ = constructDiagonalMatrix(4, num_controlled_dofs_);
       friction_li_ = constructDiagonalMatrix(0, num_controlled_dofs_);
-      joint_k_matrix_ = constructDiagonalMatrix(1, num_controlled_dofs_);
       task_k_matrix_ = constructDiagonalMatrix(10, 6);
       task_d_matrix_ = constructDiagonalMatrix(0.1, 6);
       joint_d_matrix_ = constructDiagonalMatrix(2, num_controlled_dofs_);
@@ -144,15 +143,6 @@ namespace compliant_controllers {
         return false;
       }
       task_d_matrix_ = task_d_matrix;
-      return true;
-    }
-
-    bool CompliantController::setJointKMatrix(Eigen::MatrixXd const& joint_k_matrix) {
-      if (!checkMatrix(joint_k_matrix)) {
-        std::cout << "Failed to set joint k matrix" << std::endl; 
-        return false;
-      }
-      joint_k_matrix_ = joint_k_matrix;
       return true;
     }
 

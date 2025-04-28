@@ -156,18 +156,6 @@ namespace compliant_controllers {
         [[nodiscard]]
         bool setTaskDMatrix(Eigen::MatrixXd const& task_d_matrix);
 
-        /**\fn setJointKMatrix
-         * \brief
-         *   Set the joint compliance proportional gain matrix
-         * 
-         * \param[in] joint_k_matrix
-         *   The joint compliance proportional gain matrix to be set
-         * \return
-         *   Boolean variable signalling success or failure
-        */
-        [[nodiscard]]
-        bool setJointKMatrix(Eigen::MatrixXd const& joint_k_matrix);
-
         /**\fn setJointDMatrix
          * \brief
          *   Set the joint compliance derivative gain matrix
@@ -278,8 +266,7 @@ namespace compliant_controllers {
         Eigen::MatrixXd friction_l_;
         Eigen::MatrixXd friction_lp_;
         Eigen::MatrixXd friction_li_;           // Integral friction observer gain
-        // Joint space k matrix
-        Eigen::MatrixXd joint_k_matrix_;
+        // Joint space d matrix -- adds some joint space damping
         Eigen::MatrixXd joint_d_matrix_;
         // Task space k matrix
         Eigen::MatrixXd task_k_matrix_;

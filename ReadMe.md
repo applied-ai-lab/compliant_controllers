@@ -20,9 +20,9 @@ The controller can be used for pin insertion and for replanning in the event of 
 
 https://github.com/user-attachments/assets/611a5bd9-6b1f-4e88-bd31-5ce5a897ff2d
 
+The default task and joint-space controller is tuned for both expansive movements as well as fine assembly insertions. We show these behaviours in the video below.
 
-
-
+https://github.com/user-attachments/assets/c386813f-6a8c-42f3-81cf-0325f8897e6d
 
 ## Usage
 

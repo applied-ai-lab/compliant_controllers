@@ -2,8 +2,8 @@ joint_state_controller:
   type: joint_state_controller/JointStateController
   publish_rate: 1000
 
-joint_space_compliant_controller:
-  type: compliant_controllers/JointSpaceJointTrajectoryController
+joint_task_space_compliant_controller:
+  type: compliant_controllers/JointTaskSpaceJointTrajectoryController
   robot_description_parameter: $(arg robot_description_parameter)
   end_effector_link: $(arg end_effector_link)
   apply_gravity_compensation: $(arg apply_gravity_compensation)

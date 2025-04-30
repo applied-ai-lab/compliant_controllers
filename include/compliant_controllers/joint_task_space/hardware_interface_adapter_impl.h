@@ -4,6 +4,7 @@
  *   Implementation of the compliant hardware interface adapter
  * 
  * \authors
+ *   Alexander Mitchell <mitch@robots.ox.ac.uk>
  *   Tobit Flatscher <tobit@robots.ox.ac.uk>
  * \copyright
  *   Oxford Robotics Institute - University of Oxford (2024)
@@ -31,13 +32,13 @@
 #include <pinocchio/parsers/urdf.hpp>
 #include <ros/ros.h>
 
-#include "compliant_controllers/JointSpaceCompliantControllerConfig.h"
-#include "compliant_controllers/joint_space/controller.h"
+#include "compliant_controllers/JointTaskSpaceCompliantControllerConfig.h"
+#include "compliant_controllers/joint_task_space/controller.h"
 #include "compliant_controllers/robot_state.h"
 
 
 namespace compliant_controllers {
-  namespace joint_space {
+  namespace joint_task_space {
 
     template <typename State>
     CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::CompliantHardwareInterfaceAdapter()
@@ -150,7 +151,7 @@ namespace compliant_controllers {
 
     template <typename State>
     void CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, 
-      State>::dynamicReconfigureCallback(JointSpaceCompliantControllerConfig const& config,
+      State>::dynamicReconfigureCallback(JointTaskSpaceCompliantControllerConfig const& config,
           [[maybe_unused]] uint32_t const level) {
       Eigen::MatrixXd joint_stiffness_matrix {Eigen::MatrixXd::Zero(7,7)};
       joint_stiffness_matrix.diagonal() << config.j_0, config.j_1, config.j_2, 
@@ -194,21 +195,36 @@ namespace compliant_controllers {
         friction_e_max.head(num_of_dof_)
       ); 
 
-      Eigen::MatrixXd joint_k_matrix {Eigen::MatrixXd::Zero(7,7)};
-      joint_k_matrix.diagonal() << config.k_0, config.k_1, config.k_2,
-                                  config.k_3, config.k_4, config.k_5, config.k_6;
+      Eigen::MatrixXd task_k_matrix {Eigen::MatrixXd::Zero(6,6)};
+      task_k_matrix.diagonal() << config.task_k_0, config.task_k_1, config.task_k_2,
+                                  config.task_k_3, config.task_k_4, config.task_k_5;
+      is_success = compliant_controller_->setTaskKMatrix(
+        task_k_matrix.block(0, 0, 6, 6)
+      );
+
+      Eigen::MatrixXd task_d_matrix {Eigen::MatrixXd::Zero(6,6)};
+      task_d_matrix.diagonal() << config.task_d_0, config.task_d_1, config.task_d_2,
+                                  config.task_d_3, config.task_d_4, config.task_d_5;
+      is_success = compliant_controller_->setTaskDMatrix(
+        task_d_matrix.block(0, 0, 6, 6)
+      );
+
+      Eigen::MatrixXd joint_k_matrix {Eigen::MatrixXd::Zero(7, 7)};
+      joint_k_matrix.diagonal() << config.joint_k_0, config.joint_k_1, config.joint_k_2,
+                                   config.joint_k_3, config.joint_k_4, config.joint_k_5, config.joint_k_6;
       is_success = compliant_controller_->setJointKMatrix(
         joint_k_matrix.block(0, 0, num_of_dof_, num_of_dof_)
       );
 
       Eigen::MatrixXd joint_d_matrix {Eigen::MatrixXd::Zero(7,7)};
-      joint_d_matrix.diagonal() << config.d_0, config.d_1, config.d_2,
-                                  config.d_3, config.d_4, config.d_5, config.d_6;
+      joint_d_matrix.diagonal() << config.joint_d_0, config.joint_d_1, config.joint_d_2,
+                                  config.joint_d_3, config.joint_d_4, config.joint_d_5, config.joint_d_6;
       is_success = compliant_controller_->setJointDMatrix(
         joint_d_matrix.block(0, 0, num_of_dof_, num_of_dof_)
       );
       return;
     }
+
   }
 }
 

@@ -50,21 +50,21 @@ class HardwareInterfaceAdapter<hardware_interface::EffortJointInterface,Trajecto
 namespace compliant_controllers {
   namespace joint_space {
 
-    /**\class JointSpaceJointTrajectoryController
+    /**\class JointTrajectoryController
      * \brief
      *   Compliant joint trajectory controller using the compliant hardware interface adapter
     */
-    class JointSpaceJointTrajectoryController: public
+    class JointTrajectoryController: public
       joint_trajectory_controller::JointTrajectoryController<
         trajectory_interface::QuinticSplineSegment<double>,
         hardware_interface::EffortJointInterface
       > {
       public:
-        JointSpaceJointTrajectoryController() = default;
-        JointSpaceJointTrajectoryController(JointSpaceJointTrajectoryController const&) = default;
-        JointSpaceJointTrajectoryController& operator= (JointSpaceJointTrajectoryController const&) = default;
-        JointSpaceJointTrajectoryController(JointSpaceJointTrajectoryController&&) = default;
-        JointSpaceJointTrajectoryController& operator= (JointSpaceJointTrajectoryController&&) = default;
+        JointTrajectoryController() = default;
+        JointTrajectoryController(JointTrajectoryController const&) = default;
+        JointTrajectoryController& operator= (JointTrajectoryController const&) = default;
+        JointTrajectoryController(JointTrajectoryController&&) = default;
+        JointTrajectoryController& operator= (JointTrajectoryController&&) = default;
     };
   }
 }
@@ -72,6 +72,6 @@ namespace compliant_controllers {
 #include <pluginlib/class_list_macros.h>
 
 PLUGINLIB_EXPORT_CLASS(
-  compliant_controllers::joint_space::JointSpaceJointTrajectoryController, controller_interface::ControllerBase
+  compliant_controllers::joint_space::JointTrajectoryController, controller_interface::ControllerBase
 )
 

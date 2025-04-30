@@ -29,13 +29,13 @@
 #include <joint_trajectory_controller/hardware_interface_adapter.h>
 #include <ros/ros.h>
 
-#include "compliant_controllers/TaskSpaceCompliantControllerConfig.h"
-#include "compliant_controllers/task_space/controller.h"
+#include "compliant_controllers/JointTaskSpaceCompliantControllerConfig.h"
+#include "compliant_controllers/joint_task_space/controller.h"
 #include "compliant_controllers/robot_state.h"
 
 
 namespace compliant_controllers {
-  namespace task_space {
+  namespace joint_task_space {
 
     // This is needed as we only want to specialize the effort implementation
     template <typename HardwareInterface, typename State>
@@ -123,7 +123,7 @@ namespace compliant_controllers {
          * \param[in] state_error
          *   The current state error
         */
-        void dynamicReconfigureCallback(TaskSpaceCompliantControllerConfig const& config,
+        void dynamicReconfigureCallback(JointTaskSpaceCompliantControllerConfig const& config,
           uint32_t const level);
 
         std::vector<hardware_interface::JointHandle>* joint_handles_ptr_;
@@ -134,13 +134,13 @@ namespace compliant_controllers {
         RobotState current_state_;
         Eigen::VectorXd command_effort_;
         dynamic_reconfigure::Server<
-          TaskSpaceCompliantControllerConfig> dynamic_reconfigure_server_;
+          JointTaskSpaceCompliantControllerConfig> dynamic_reconfigure_server_;
         dynamic_reconfigure::Server<
-          TaskSpaceCompliantControllerConfig>::CallbackType dynamic_reconfigure_callback_;
+          JointTaskSpaceCompliantControllerConfig>::CallbackType dynamic_reconfigure_callback_;
     };
   }
 }
 
 #endif // COMPLIANT_CONTROLLERS__HARDWARE_INTERFACE_ADAPTER
 
-#include "compliant_controllers/task_space/hardware_interface_adapter_impl.h"
+#include "compliant_controllers/joint_task_space/hardware_interface_adapter_impl.h"

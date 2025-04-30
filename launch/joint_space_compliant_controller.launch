@@ -1,5 +1,7 @@
 <launch>
   <arg name="end_effector_link" default="end_effector_link"/>
+  <!-- The hardware interface applies gravity compensation so set apply gravity to false -->
+  <arg name="apply_gravity_compensation" default="false" doc="The hardware interface applies gravity compensation so set apply gravity to false"/>
   <arg name="robot_description_parameter" default="robot_description"/>
 
   <!-- Load controller configuration -->

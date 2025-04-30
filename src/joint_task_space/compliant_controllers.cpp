@@ -22,7 +22,7 @@
 #include <joint_trajectory_controller/joint_trajectory_controller.h>
 #include <trajectory_interface/quintic_spline_segment.h>
 
-#include "compliant_controllers/task_space/hardware_interface_adapter.h"
+#include "compliant_controllers/joint_task_space/hardware_interface_adapter.h"
 
 
 // Convenient alias
@@ -36,7 +36,7 @@ using TrajectoryState = joint_trajectory_controller::JointTrajectorySegment<
 */
 template <>
 class HardwareInterfaceAdapter<hardware_interface::EffortJointInterface,TrajectoryState>: public
-      compliant_controllers::task_space::CompliantHardwareInterfaceAdapter<
+      compliant_controllers::joint_task_space::CompliantHardwareInterfaceAdapter<
         hardware_interface::EffortJointInterface,TrajectoryState
       > {
   public:
@@ -48,7 +48,7 @@ class HardwareInterfaceAdapter<hardware_interface::EffortJointInterface,Trajecto
 };
 
 namespace compliant_controllers {
-  namespace task_space {
+  namespace joint_task_space {
 
     /**\class JointTrajectoryController
      * \brief
@@ -72,6 +72,6 @@ namespace compliant_controllers {
 #include <pluginlib/class_list_macros.h>
 
 PLUGINLIB_EXPORT_CLASS(
-  compliant_controllers::task_space::JointTrajectoryController, controller_interface::ControllerBase
+  compliant_controllers::joint_task_space::JointTrajectoryController, controller_interface::ControllerBase
 )
 

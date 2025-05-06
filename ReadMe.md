@@ -111,6 +111,22 @@ https://github.com/applied-ai-lab/compliant_controllers/blob/feat/joint-task-com
 ```
 where the **MODE** is the controller type e.g. (joint_task_space, joint, task).
 
+## Cite This Controller
+
+We have written a technical report and posted it on [arxiv](https://arxiv.org/abs/2504.21159). Please cite this paper when you use this controller in your publications. 
+
+```bash
+@misc{mitchell2025taskjointspacedualarm,
+      title={Task and Joint Space Dual-Arm Compliant Control}, 
+      author={Alexander L. Mitchell and Tobit Flatscher and Ingmar Posner},
+      year={2025},
+      eprint={2504.21159},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2504.21159}, 
+}
+```
+
 ## Known issues
 
 This package has a few limitations mostly stemming from its initial implementation. We will try to resolve these over time.

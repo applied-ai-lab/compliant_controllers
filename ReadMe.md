@@ -28,7 +28,7 @@ https://github.com/user-attachments/assets/c386813f-6a8c-42f3-81cf-0325f8897e6d
 
 ### Running on the hardware
 
-This code must be used in combination with the **`kortex_hardware` hardware interface** (see [here](https://github.com/applied-ai-lab/kortex_hardware) for the installation instructions) as the hardware interface implements torque filtering as well as **gravity compensation**. The 
+This code must be used in combination with the **`kortex_hardware` hardware interface** (see [here](https://github.com/applied-ai-lab/kortex_hardware) for the installation instructions) as the hardware interface implements torque filtering as well as **gravity compensation**. 
 
 You will have to run the `kortex_hardware` hardware interface as well as this controller. The hardware interface launches in effort mode by default, meaning that the controller can be started.
 

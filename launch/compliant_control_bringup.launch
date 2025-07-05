@@ -1,0 +1,82 @@
+<launch>
+  <arg name="prefix" default=""/>
+  <arg name="xacro_file" default=""/>
+  <arg name="urdf_file" default=""/>
+  <arg name="namespace" default=""/>
+  <arg name="ip_address" default="" doc="IP address for TCP/UDP comms"/>
+  <arg name="cpu_core" default="" doc="CPU core to pin the hardware interface to"/>
+
+  <param name="$(arg prefix)robot_description" command="xacro --inorder '$(arg xacro_file)'"/>
+
+  <!-- Gen3 specific arguments required by Kortex API for instantiating a private communication session -->
+  <arg name="username" default="admin" doc="Username for kortex session"/>
+  <arg name="password" default="admin" doc="Password for kortex session"/>
+  <arg name="api_session_inactivity_timeout_ms" default="50000"/> <!--milliseconds-->
+  <arg name="api_connection_inactivity_timeout_ms" default="40000"/> <!--milliseconds-->
+  <arg name="dof" default="7"/>
+  <arg name="use_admittance" default="false"/> <!--set to true to use admittance mode provided by kinova-->
+  <arg name="current_control" default="true"/>
+  <arg name="use_gripper" default="false"/>
+  <arg name="end_effector" default="end_effector_link"/>
+  <!-- The hardware interface applies gravity compensation so set apply gravity to false -->
+  <arg name="apply_gravity_compensation" default="false" doc="The hardware interface applies gravity compensation so set apply gravity to false"/>
+  <arg name="controller_type" default="joint_task"/>
+
+  <!-- <param name="end_effector_link" type="string" value="$(arg end_effector)"/>
+  <param name="robot_description_parameter" type="string" value="/$(arg namespace)/$(arg prefix)robot_description"/> -->
+ 
+  <!-- Gen3 Hardware Node -->
+  <node name="$(arg prefix)kortex_hardware" pkg="kortex_hardware" type="kortex_hardware"
+      	output="screen">
+  	<param name="ip_address" value="$(arg ip_address)"/>
+  	<param name="username" value="$(arg username)"/>
+  	<param name="password" value="$(arg password)"/>
+  	<param name="api_session_inactivity_timeout_ms" value="$(arg api_session_inactivity_timeout_ms)"/>
+  	<param name="api_connection_inactivity_timeout_ms" value="$(arg api_connection_inactivity_timeout_ms)"/>
+  	<param name="dof" value="$(arg dof)"/>
+  	<param name="use_admittance" value="$(arg use_admittance)"/>
+  	<param name="current_control" value="$(arg current_control)"/>
+  	<param name="use_gripper" value="$(arg use_gripper)"/>
+  	<param name="cpu_core" value="$(arg cpu_core)"/>
+    <param name="urdf_file" value="$(arg urdf_file)"/>
+    <param name="prefix" value="$(arg prefix)"/>
+    <!-- <remap from="joint_states" to="/joint_states"/> -->
+  </node>
+
+  <!-- load controller configuration -->
+  <rosparam file="$(find compliant_controllers)/config/$(arg controller_type)space_compliant_controllers.yaml" command="load" subst_value="true"/>
+  <rosparam file="$(find kortex_control)/grippers/robotiq_2f_85/config/gripper_action_controller_parameters.yaml" command="load" subst_value="true"/>
+  <rosparam file="$(find kortex_control)/arms/gen3/$(arg dof)dof/config/joint_position_controllers.yaml" command="load" subst_value="true"/>
+
+  <!-- start joint state and other controllers -->
+  <group if="$(eval controller_type == 'joint_task')">
+    <node name="$(arg prefix)compliant_controller_spawner_started" pkg="controller_manager" type="spawner" respawn="false"
+    	output="screen"
+    	args="
+        --stopped
+        $(arg prefix)compliant_controller
+        $(arg prefix)robotiq_2f_85_gripper_controller
+    	" />
+  </group>
+  <group if="$(eval controller_type == 'joint')">
+    <node name="$(arg prefix)compliant_controller_spawner_started" pkg="controller_manager" type="spawner" respawn="false"
+    	output="screen"
+    	args="
+        --stopped
+        $(arg prefix)compliant_controller
+        $(arg prefix)robotiq_2f_85_gripper_controller
+    	" />
+  </group>
+  <group if="$(eval controller_type == 'task')">
+    <node name="$(arg prefix)compliant_controller_spawner_started" pkg="controller_manager" type="spawner" respawn="false"
+    	output="screen"
+    	args="
+        --stopped
+        $(arg prefix)compliant_controller
+        $(arg prefix)robotiq_2f_85_gripper_controller
+    	" />
+  </group>
+
+  <node name="arm_rebroadcaster" pkg="topic_tools" type="relay" args="joint_states /joint_states"/>
+
+</launch>

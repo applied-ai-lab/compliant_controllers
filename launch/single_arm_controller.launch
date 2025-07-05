@@ -1,0 +1,34 @@
+<launch>
+
+  <arg name="arm_ns" default="arm"/>
+
+  <arg name="control_mode" default="joint_task" doc="This dictates which mode the controller will be in either [joint_task, task, joint]"/>
+
+  <group ns="$(arg arm_ns)">
+  <node name="controller_spawner_started" pkg="controller_manager" type="spawner" respawn="false"
+  	output="screen"
+  	args="
+    	joint_state_controller
+  	"/>
+    
+  <include file="$(find compliant_controllers)/launch/compliant_control_bringup.launch">
+    <arg name="prefix" default="kinova_arm_"/>
+
+    <!-- Replace these descriptions with your own descriptions -->
+    <arg name="xacro_file" default="$(find kortex_description)/robots/gen3_robotiq_2f_85.xacro"/>
+    <arg name="urdf_file" default="$(find kortex_description)/robots/gen3_robotiq_2f_85.xacro"/>
+
+    <arg name="use_gripper" default="true"/>
+    <arg name="namespace" default="$(arg arm_ns)"/>
+    <arg name="ip_address" default="192.168.1.10"/>
+    <arg name="cpu_core" value="0"/>
+    <arg name="controller_type" default="$(arg control_mode)"/>
+    <arg name="end_effector" default="tool_frame"/>
+    <!-- The hardware interface applies gravity compensation so set apply gravity to false -->
+    <arg name="apply_gravity_compensation" default="false" doc="The hardware interface applies gravity compensation so set apply gravity to false"/>
+  </include>
+
+  </group>
+
+
+</launch>

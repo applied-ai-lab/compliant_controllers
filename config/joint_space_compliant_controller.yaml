@@ -2,11 +2,92 @@ joint_state_controller:
   type: joint_state_controller/JointStateController
   publish_rate: 1000
 
-joint_space_compliant_controller:
-  type: compliant_controllers/JointSpaceJointTrajectoryController
-  robot_description_parameter: $(arg robot_description_parameter)
-  end_effector_link: $(arg end_effector_link)
-  apply_gravity_compensation: $(arg apply_gravity_compensation)
-  joints: [joint_1, joint_2, joint_3,
-    joint_4, joint_5, joint_6, joint_7]
+$(arg prefix)position_controller:
+  type: position_controllers/JointGroupPositionController
+  joints: [$(arg prefix)joint_1, $(arg prefix)joint_2, $(arg prefix)joint_3,
+    $(arg prefix)joint_4, $(arg prefix)joint_5, $(arg prefix)joint_6, $(arg prefix)joint_7]
 
+$(arg prefix)velocity_controller:
+  type: velocity_controllers/JointGroupVelocityController
+  joints: [$(arg prefix)joint_1, $(arg prefix)joint_2, $(arg prefix)joint_3,
+    $(arg prefix)joint_4, $(arg prefix)joint_5, $(arg prefix)joint_6, $(arg prefix)joint_7]
+
+$(arg prefix)trajectory_velocity_controller:
+  type: velocity_controllers/JointTrajectoryController
+  joints: [$(arg prefix)joint_1, $(arg prefix)joint_2, $(arg prefix)joint_3,
+    $(arg prefix)joint_4, $(arg prefix)joint_5, $(arg prefix)joint_6, $(arg prefix)joint_7]
+  constraints:
+    stopped_velocity_tolerance: 1.0
+    $(arg prefix)joint_1:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_2:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_3:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_4:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_5:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_6:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_7:
+      goal: 0.02
+      trajectory: 7
+  gains: # Required because we're controlling a velocity interface
+    $(arg prefix)joint_1: {p: 10,  d: 0, i: 0, i_clamp: 1}
+    $(arg prefix)joint_2: {p: 10,  d: 0, i: 0, i_clamp: 1}
+    $(arg prefix)joint_3: {p: 10,  d: 0, i: 0, i_clamp: 1}
+    $(arg prefix)joint_4: {p: 10,  d: 0, i: 0, i_clamp: 1}
+    $(arg prefix)joint_5: {p: 10,  d: 0, i: 0, i_clamp: 1}
+    $(arg prefix)joint_6: {p: 10,  d: 0, i: 0, i_clamp: 1}
+    $(arg prefix)joint_7: {p: 10,  d: 0, i: 0, i_clamp: 1}
+
+$(arg prefix)effort_controller:
+  type: effort_controllers/JointTrajectoryController
+  joints: [$(arg prefix)joint_1, $(arg prefix)joint_2, $(arg prefix)joint_3,
+    $(arg prefix)joint_4, $(arg prefix)joint_5, $(arg prefix)joint_6, $(arg prefix)joint_7]
+  constraints:
+    stopped_velocity_tolerance: 1.0
+    $(arg prefix)joint_1:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_2:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_3:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_4:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_5:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_6:
+      goal: 0.02
+      trajectory: 7
+    $(arg prefix)joint_7:
+      goal: 0.02
+      trajectory: 7
+  gains: # Required because we're controlling a velocity interface
+    $(arg prefix)joint_1: {p: 100,  d: 16.5, i: 0, i_clamp: 3}
+    $(arg prefix)joint_2: {p: 130,  d: 16.5, i: 0.03, i_clamp: 3}
+    $(arg prefix)joint_3: {p: 130,  d: 16.5, i: 0.03, i_clamp: 3}
+    $(arg prefix)joint_4: {p: 130,  d: 16.5, i: 0.03, i_clamp: 3}
+    $(arg prefix)joint_5: {p: 130,  d: 16.5, i: 0.03, i_clamp: 3}
+    $(arg prefix)joint_6: {p: 130,  d: 16.5, i: 0.03, i_clamp: 3}
+    $(arg prefix)joint_7: {p: 130,  d: 16.5, i: 0.03, i_clamp: 3}
+
+$(arg prefix)compliant_controller:
+  type: compliant_controllers/JointSpaceJointTrajectoryController
+  robot_description_parameter: /$(arg namespace)/$(arg prefix)robot_description
+  end_effector_link: $(arg end_effector)
+  apply_gravity_compensation: $(arg apply_gravity_compensation)
+  joints: [$(arg prefix)joint_1, $(arg prefix)joint_2, $(arg prefix)joint_3,
+    $(arg prefix)joint_4, $(arg prefix)joint_5, $(arg prefix)joint_6, $(arg prefix)joint_7]

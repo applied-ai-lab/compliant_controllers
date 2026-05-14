@@ -69,11 +69,6 @@ namespace compliant_controllers {
       }
       if (std::abs(target_joint_positions(i) - current_joint_positions_(i)) >= threshold_) {
         diff_joint_positions_(i) += normalize(target_joint_positions(i)) - normalize(current_joint_positions_(i));
-        // std::cout << "========================" << std::endl;
-        // std::cout << " BRANCH 1 IN UPDATE JOINT POSITIONS: " << i << ", " << target_joint_positions(i) << ", " << current_joint_positions_(i) << std::endl;
-        // std::cout << diff_joint_positions_(i) << std::endl;
-        // std::cout << "========================" << std::endl;
-        
       } else {
         // Verified via test/test_extended_joint_positions.cpp.
         // The else-branch algebra is correct for normal use; the

@@ -18,7 +18,9 @@
 #define COMPLIANT_CONTROLLERS__JOINT_SPACE_COMPLIANT_CONTROLLER
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -206,9 +208,31 @@ namespace compliant_controllers {
          *   The sum of the errors
         */
         [[nodiscard]]
-        Eigen::VectorXd integrate_error(Eigen::VectorXd const& desired_q, 
+        Eigen::VectorXd integrate_error(Eigen::VectorXd const& desired_q,
                                         Eigen::VectorXd const& current_q);
-        
+
+        // ---- NaN diagnostics (see docs/diagnosis_report.md F1-F4) -------
+        // Accessors so the hosting HardwareInterfaceAdapter's
+        // diagnostics timer can read counters without touching
+        // controller internals.  All atomics, safe to call from the
+        // spinner thread while the controller-manager update thread
+        // increments them.
+        [[nodiscard]] std::uint64_t getNanIntegratorResetCount() const noexcept {
+          return nan_integrator_resets_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanPinocchioThrowCount() const noexcept {
+          return nan_pinocchio_throws_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanPinocchioOutputCount() const noexcept {
+          return nan_pinocchio_output_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanQErrorSumResetCount() const noexcept {
+          return nan_q_error_sum_resets_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanExtendedJointCount() const noexcept {
+          return (extended_joints_ != nullptr) ? extended_joints_->getNanCount() : 0;
+        }
+
 
       protected:
         /**\fn constructDiagonalMatrix
@@ -270,6 +294,17 @@ namespace compliant_controllers {
         Eigen::VectorXd nominal_theta_;
         Eigen::VectorXd nominal_friction_;
         Eigen::VectorXd efforts_;
+
+        // Diagnostic counters for the NaN trap-breaks.  See
+        // docs/diagnosis_report.md F1 (integrator reset), F2
+        // (Pinocchio failure), F3 (q_error_sum_ reset).  All
+        // increments are on the controller-manager update thread;
+        // reads via the get*Count accessors above happen on the
+        // adapter's diagnostics-timer thread.
+        std::atomic<std::uint64_t> nan_integrator_resets_{0};
+        std::atomic<std::uint64_t> nan_pinocchio_throws_{0};
+        std::atomic<std::uint64_t> nan_pinocchio_output_{0};
+        std::atomic<std::uint64_t> nan_q_error_sum_resets_{0};
     };
   } // namespace compliant_controllers
 } // joint_space

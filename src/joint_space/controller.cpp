@@ -158,7 +158,39 @@ namespace compliant_controllers {
 
       extended_joints_->update(current_state.positions);
       current_theta_ = extended_joints_->getPositions();
-      gravity_ = pinocchio::computeGeneralizedGravity(*robot_model_, *data_, joint_ros_to_pinocchio(current_theta_, *robot_model_));
+
+      // F2: Pinocchio defence.  computeGeneralizedGravity can throw
+      // (dimension mismatch, internal asserts) or return a vector
+      // with non-finite entries if `q_` contains NaN.  Either failure
+      // mode silently poisons the integrator chain below — see
+      // docs/diagnosis_report.md C2.  Catch the throw, scan the
+      // output, increment the appropriate counter; on any failure
+      // zero out the gravity for this cycle.  Combined with F1's
+      // integrator trap-break, this guarantees gravity_ is finite
+      // before line 170's multiply.
+      try {
+        gravity_ = pinocchio::computeGeneralizedGravity(
+            *robot_model_, *data_,
+            joint_ros_to_pinocchio(current_theta_, *robot_model_));
+      } catch (const std::exception& ex) {
+        nan_pinocchio_throws_.fetch_add(1, std::memory_order_relaxed);
+        ROS_ERROR_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_space] Pinocchio "
+            "computeGeneralizedGravity threw: %s — zeroing gravity",
+            ex.what());
+        gravity_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
+      }
+      if (!gravity_.allFinite()) {
+        nan_pinocchio_output_.fetch_add(1, std::memory_order_relaxed);
+        ROS_WARN_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_space] Pinocchio gravity "
+            "non-finite — zeroing affected entries");
+        for (Eigen::Index i = 0; i < gravity_.size(); ++i) {
+          if (!std::isfinite(gravity_[i])) gravity_[i] = 0.0;
+        }
+      }
 
       // Gravity compensation is performed inside the hardware interface
       task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_) - 
@@ -183,8 +215,34 @@ namespace compliant_controllers {
       // Apply gravity compensation if required
       if (apply_gravity_) { efforts_ += gravity_; }
 
-      nominal_theta_prev_ = nominal_theta_;
-      nominal_theta_dot_prev_ = nominal_theta_dot_;
+      // F1: Integrator trap-break.  `nominal_theta_*_prev_` are the
+      // persistent integrator state for the controller — once they
+      // become non-finite, every subsequent computeEffort produces
+      // non-finite output and no in-loop mechanism recovers (init()
+      // doesn't reset them; switch_controller doesn't help; only a
+      // full re-construction of CompliantController does — which
+      // means a process restart).  Detect a non-finite update HERE,
+      // before it poisons the next cycle, and reset to the current
+      // measurements (lose one cycle of momentum tracking but break
+      // the lock-up).  See docs/diagnosis_report.md F1 + C1.
+      if (!nominal_theta_.allFinite() || !nominal_theta_dot_.allFinite()) {
+        nan_integrator_resets_.fetch_add(1, std::memory_order_relaxed);
+        ROS_WARN_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_space] integrator state "
+            "went non-finite — resetting nominal_theta_*_prev_ to "
+            "current measurements");
+        nominal_theta_prev_     = current_theta_;
+        nominal_theta_dot_prev_ = current_state.velocities;
+        // Also force efforts_ to a safe value (zero) for THIS
+        // cycle — the integrator that produced efforts_ was
+        // already corrupted, so its output is junk.  The next
+        // cycle starts fresh from the reset _prev_ values.
+        efforts_.setZero();
+      } else {
+        nominal_theta_prev_     = nominal_theta_;
+        nominal_theta_dot_prev_ = nominal_theta_dot_;
+      }
 
       return efforts_;
     }
@@ -194,6 +252,23 @@ namespace compliant_controllers {
     {
       q_error_ = desired_q - current_q;
       q_error_sum_ += q_error_;
+
+      // F3: q_error_sum_ trap-break.  cwiseMin/cwiseMax do NOT
+      // recover from NaN per IEEE 754 (min(NaN, finite) == NaN).
+      // So a one-cycle NaN in q_error_ leaves q_error_sum_ NaN
+      // forever, poisoning the friction term every subsequent
+      // cycle.  Detect and zero — sacrifice the integral term for
+      // this cycle, but break the trap.  See
+      // docs/diagnosis_report.md F3 + C3.
+      if (!q_error_sum_.allFinite()) {
+        nan_q_error_sum_resets_.fetch_add(1, std::memory_order_relaxed);
+        ROS_WARN_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_space] q_error_sum_ went "
+            "non-finite — resetting to zero");
+        q_error_sum_.setZero();
+      }
+
       // Clamp the integrated error
       q_error_sum_ = q_error_sum_.cwiseMin(q_error_max_).cwiseMax(-q_error_max_);
       return q_error_sum_;

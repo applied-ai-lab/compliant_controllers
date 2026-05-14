@@ -16,6 +16,8 @@
 #define COMPLIANT_CONTROLLERS__HARDWARE_INTERFACE_ADAPTER
 #pragma once
 
+#include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -126,6 +128,20 @@ namespace compliant_controllers {
       void dynamicReconfigureCallback(JointSpaceCompliantControllerConfig const& config,
         uint32_t const level);
 
+      /**\fn diagnosticsTimerCallback
+       * \brief
+       *   1 Hz publisher of the NaN-counter snapshot from the
+       *   controller + this adapter.  See F6 in
+       *   docs/diagnosis_report.md.  Output topic
+       *   ~diagnostics/nan_counts (std_msgs/UInt64MultiArray).
+       *   Layout: [integrator_resets, pinocchio_throws,
+       *   pinocchio_nan_out, q_error_sum_resets,
+       *   extended_joints_nan, output_guard_hits, last_bad_joint].
+       *   `last_bad_joint` is stored as int (-1 = none yet); cast to
+       *   uint64 for the multiarray.
+      */
+      void diagnosticsTimerCallback(ros::TimerEvent const& evt);
+
       std::vector<hardware_interface::JointHandle>* joint_handles_ptr_;
       std::unique_ptr<CompliantController> compliant_controller_;
       bool execute_default_command_;
@@ -137,6 +153,23 @@ namespace compliant_controllers {
         JointSpaceCompliantControllerConfig> dynamic_reconfigure_server_;
       dynamic_reconfigure::Server<
         JointSpaceCompliantControllerConfig>::CallbackType dynamic_reconfigure_callback_;
+
+      // ---- NaN diagnostics (see docs/diagnosis_report.md F5+F6) -------
+      // F5: counters incremented by updateCommand's boundary guard
+      // immediately before joint_handle.setCommand().  Atomic so
+      // the diagnostics timer (which runs on the spinner thread)
+      // can read concurrently with the controller-manager update
+      // thread's increment.
+      std::atomic<std::uint64_t> nan_output_count_{0};
+      std::atomic<int>           nan_last_joint_{-1};
+
+      // F6: 1 Hz publisher + timer, attached in init().  Subscribers
+      // see [integrator_resets, pinocchio_throws, pinocchio_nan_out,
+      // q_error_sum_resets, extended_joints_nan, output_guard_hits,
+      // last_bad_joint].  Matches the kortex_hardware naming pattern
+      // so operator dashboards are consistent across the stack.
+      ros::Timer       diag_timer_;
+      ros::Publisher   diag_pub_;
     };
   
   }

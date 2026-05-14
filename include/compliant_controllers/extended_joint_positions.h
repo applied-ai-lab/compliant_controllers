@@ -17,6 +17,9 @@
 #ifndef COMPLIANT_CONTROLLERS__EXTENDED_JOINT_POSITIONS
 #define COMPLIANT_CONTROLLERS__EXTENDED_JOINT_POSITIONS
 
+#include <atomic>
+#include <cstdint>
+
 #include <Eigen/Eigen>
 
 
@@ -93,6 +96,22 @@ namespace compliant_controllers {
         return is_initialized_;
       }
 
+      /**\fn getNanCount
+       * \brief
+       *   Diagnostic accessor — number of times update() received a
+       *   non-finite target and skipped the per-joint update to avoid
+       *   propagating NaN into diff_joint_positions_.  See F4 in
+       *   docs/diagnosis_report.md.
+       *
+       * \return
+       *   Cumulative count of non-finite targets received since
+       *   construction.
+      */
+      [[nodiscard]]
+      std::uint64_t getNanCount() const noexcept {
+        return nan_count_.load(std::memory_order_relaxed);
+      }
+
     protected:
       /**\fn normalize
        * \brief
@@ -125,6 +144,13 @@ namespace compliant_controllers {
       Eigen::VectorXd normalized_target_joint_positions_;
       Eigen::VectorXd diff_joint_positions_;
       Eigen::VectorXd current_joint_positions_;
+
+      // Diagnostic counter for non-finite target inputs.  See F4 in
+      // docs/diagnosis_report.md.  Atomic so the read in
+      // getNanCount() (called from the adapter's diagnostics timer
+      // on the spinner thread) is safe vs the increment on the
+      // controller-manager update thread.
+      std::atomic<std::uint64_t> nan_count_{0};
   };
 
 }

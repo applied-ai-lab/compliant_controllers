@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   joint_trajectory_controller
   pluginlib
   roscpp
+  std_msgs
 )
 find_package(pinocchio REQUIRED)
 
@@ -23,7 +24,7 @@ generate_dynamic_reconfigure_options(
   config/TaskSpaceParams.cfg
 )
 
-catkin_package( 
+catkin_package(
   CATKIN_DEPENDS
   controller_interface
   driver_base
@@ -32,6 +33,7 @@ catkin_package(
   joint_trajectory_controller
   pluginlib
   roscpp
+  std_msgs
 )
 find_package(Eigen3 REQUIRED)
 

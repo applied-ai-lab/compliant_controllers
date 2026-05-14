@@ -31,6 +31,9 @@
 #include <pinocchio/parsers/urdf.hpp>
 #include <ros/ros.h>
 
+#include <cmath>
+#include <std_msgs/UInt64MultiArray.h>
+
 #include "compliant_controllers/JointSpaceCompliantControllerConfig.h"
 #include "compliant_controllers/joint_space/controller.h"
 #include "compliant_controllers/robot_state.h"
@@ -87,6 +90,20 @@ namespace compliant_controllers {
       using namespace boost::placeholders;
       dynamic_reconfigure_callback_ = boost::bind(&CompliantHardwareInterfaceAdapter::dynamicReconfigureCallback, this, _1, _2);
       dynamic_reconfigure_server_.setCallback(dynamic_reconfigure_callback_);
+
+      // F6: NaN-diagnostics publisher + 1 Hz timer.  Topic lives
+      // under the controller's namespace, so each loaded controller
+      // gets its own ~diagnostics/nan_counts.  Single-threaded
+      // spinner reads atomics — no per-cycle overhead.
+      diag_pub_ = controller_nh.advertise<std_msgs::UInt64MultiArray>(
+          "diagnostics/nan_counts", 10);
+      diag_timer_ = controller_nh.createTimer(
+          ros::Duration(1.0),
+          &CompliantHardwareInterfaceAdapter::diagnosticsTimerCallback,
+          this);
+      ROS_INFO("[compliant_controllers/joint_space] NaN diagnostics "
+               "publisher attached on ~diagnostics/nan_counts (1 Hz)");
+
       return true;
     }
 
@@ -142,10 +159,53 @@ namespace compliant_controllers {
       // TODO: Perform checks that the dimensions are correct!
       command_effort_ = compliant_controller_->computeEffort(desired_state_, current_state_, period);
 
+      // F5: Boundary guard.  This is the last gate between the
+      // compliant controller and the hardware interface — even if
+      // every upstream trap-break (F1-F4) misses something, a
+      // non-finite value caught here is substituted with 0.0,
+      // counted, and a throttled WARN is emitted identifying the
+      // offending joint.  Analog of kortex_hardware's `isfinite`
+      // check at `set_torque_joint`.  See docs/diagnosis_report.md F5.
       for (Eigen::Index i = 0; i < command_effort_.size(); ++i) {
-        (*joint_handles_ptr_)[i].setCommand(command_effort_(i));
+        double e {command_effort_(i)};
+        if (!std::isfinite(e)) {
+          nan_output_count_.fetch_add(1, std::memory_order_relaxed);
+          nan_last_joint_.store(static_cast<int>(i),
+                                std::memory_order_relaxed);
+          ROS_WARN_THROTTLE(
+              1.0,
+              "[compliant_controllers/joint_space] non-finite command "
+              "on joint %ld (was %f) — substituting 0.0",
+              static_cast<long>(i), e);
+          e = 0.0;
+        }
+        (*joint_handles_ptr_)[i].setCommand(e);
       }
       return;
+    }
+
+    template <typename State>
+    void CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::diagnosticsTimerCallback(
+        ros::TimerEvent const&) {
+      // Snapshot atomics into a UInt64MultiArray and publish.  See
+      // docs/diagnosis_report.md §6 for the counter-semantics table.
+      std_msgs::UInt64MultiArray msg;
+      msg.data.resize(7);
+      if (compliant_controller_) {
+        msg.data[0] = compliant_controller_->getNanIntegratorResetCount();
+        msg.data[1] = compliant_controller_->getNanPinocchioThrowCount();
+        msg.data[2] = compliant_controller_->getNanPinocchioOutputCount();
+        msg.data[3] = compliant_controller_->getNanQErrorSumResetCount();
+        msg.data[4] = compliant_controller_->getNanExtendedJointCount();
+      } else {
+        msg.data[0] = msg.data[1] = msg.data[2] = msg.data[3] = msg.data[4] = 0;
+      }
+      msg.data[5] = nan_output_count_.load(std::memory_order_relaxed);
+      // last_joint is signed (-1 = none yet); cast to uint64 — -1
+      // becomes UINT64_MAX on the wire, easy to spot.
+      msg.data[6] = static_cast<std::uint64_t>(
+          nan_last_joint_.load(std::memory_order_relaxed));
+      diag_pub_.publish(msg);
     }
 
     template <typename State>

@@ -32,6 +32,9 @@
 #include <pinocchio/parsers/urdf.hpp>
 #include <ros/ros.h>
 
+#include <cmath>
+#include <std_msgs/UInt64MultiArray.h>
+
 #include "compliant_controllers/JointTaskSpaceCompliantControllerConfig.h"
 #include "compliant_controllers/joint_task_space/controller.h"
 #include "compliant_controllers/robot_state.h"
@@ -88,6 +91,17 @@ namespace compliant_controllers {
       using namespace boost::placeholders;
       dynamic_reconfigure_callback_ = boost::bind(&CompliantHardwareInterfaceAdapter::dynamicReconfigureCallback, this, _1, _2);
       dynamic_reconfigure_server_.setCallback(dynamic_reconfigure_callback_);
+
+      // F6: NaN-diagnostics publisher + 1 Hz timer.
+      diag_pub_ = controller_nh.advertise<std_msgs::UInt64MultiArray>(
+          "diagnostics/nan_counts", 10);
+      diag_timer_ = controller_nh.createTimer(
+          ros::Duration(1.0),
+          &CompliantHardwareInterfaceAdapter::diagnosticsTimerCallback,
+          this);
+      ROS_INFO("[compliant_controllers/joint_task_space] NaN diagnostics "
+               "publisher attached on ~diagnostics/nan_counts (1 Hz)");
+
       return true;
     }
 
@@ -143,10 +157,43 @@ namespace compliant_controllers {
       // TODO: Perform checks that the dimensions are correct!
       command_effort_ = compliant_controller_->computeEffort(desired_state_, current_state_, period);
 
+      // F5: Boundary guard — see joint_space adapter for rationale.
       for (Eigen::Index i = 0; i < command_effort_.size(); ++i) {
-        (*joint_handles_ptr_)[i].setCommand(command_effort_(i));
+        double e {command_effort_(i)};
+        if (!std::isfinite(e)) {
+          nan_output_count_.fetch_add(1, std::memory_order_relaxed);
+          nan_last_joint_.store(static_cast<int>(i),
+                                std::memory_order_relaxed);
+          ROS_WARN_THROTTLE(
+              1.0,
+              "[compliant_controllers/joint_task_space] non-finite "
+              "command on joint %ld (was %f) — substituting 0.0",
+              static_cast<long>(i), e);
+          e = 0.0;
+        }
+        (*joint_handles_ptr_)[i].setCommand(e);
       }
       return;
+    }
+
+    template <typename State>
+    void CompliantHardwareInterfaceAdapter<hardware_interface::EffortJointInterface, State>::diagnosticsTimerCallback(
+        ros::TimerEvent const&) {
+      std_msgs::UInt64MultiArray msg;
+      msg.data.resize(7);
+      if (compliant_controller_) {
+        msg.data[0] = compliant_controller_->getNanIntegratorResetCount();
+        msg.data[1] = compliant_controller_->getNanPinocchioThrowCount();
+        msg.data[2] = compliant_controller_->getNanPinocchioOutputCount();
+        msg.data[3] = compliant_controller_->getNanQErrorSumResetCount();
+        msg.data[4] = compliant_controller_->getNanExtendedJointCount();
+      } else {
+        msg.data[0] = msg.data[1] = msg.data[2] = msg.data[3] = msg.data[4] = 0;
+      }
+      msg.data[5] = nan_output_count_.load(std::memory_order_relaxed);
+      msg.data[6] = static_cast<std::uint64_t>(
+          nan_last_joint_.load(std::memory_order_relaxed));
+      diag_pub_.publish(msg);
     }
 
     template <typename State>

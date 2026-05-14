@@ -215,7 +215,30 @@ namespace compliant_controllers {
       extended_joints_->update(current_state.positions);
       current_theta_ = extended_joints_->getPositions();
 
-      gravity_ = pinocchio::computeGeneralizedGravity(*robot_model_, *data_, joint_ros_to_pinocchio(current_theta_, *robot_model_));
+      // F2: Pinocchio defence (see docs/diagnosis_report.md C2, F2).
+      try {
+        gravity_ = pinocchio::computeGeneralizedGravity(
+            *robot_model_, *data_,
+            joint_ros_to_pinocchio(current_theta_, *robot_model_));
+      } catch (const std::exception& ex) {
+        nan_pinocchio_throws_.fetch_add(1, std::memory_order_relaxed);
+        ROS_ERROR_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_task_space] Pinocchio "
+            "computeGeneralizedGravity threw: %s — zeroing gravity",
+            ex.what());
+        gravity_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
+      }
+      if (!gravity_.allFinite()) {
+        nan_pinocchio_output_.fetch_add(1, std::memory_order_relaxed);
+        ROS_WARN_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_task_space] Pinocchio gravity "
+            "non-finite — zeroing affected entries");
+        for (Eigen::Index i = 0; i < gravity_.size(); ++i) {
+          if (!std::isfinite(gravity_[i])) gravity_[i] = 0.0;
+        }
+      }
     
       // DESIRED AND NOMINAL TRANSFORMS FOR ERROR PREDICTION
 
@@ -270,8 +293,20 @@ namespace compliant_controllers {
       // Apply gravity compensation if desired
       if (apply_gravity_) { efforts_ += gravity_; }
 
-      nominal_theta_prev_ = nominal_theta_;
-      nominal_theta_dot_prev_ = nominal_theta_dot_;
+      // F1: Integrator trap-break — see docs/diagnosis_report.md.
+      if (!nominal_theta_.allFinite() || !nominal_theta_dot_.allFinite()) {
+        nan_integrator_resets_.fetch_add(1, std::memory_order_relaxed);
+        ROS_WARN_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_task_space] integrator state "
+            "went non-finite — resetting nominal_theta_*_prev_ to current");
+        nominal_theta_prev_     = current_theta_;
+        nominal_theta_dot_prev_ = current_state.velocities;
+        efforts_.setZero();
+      } else {
+        nominal_theta_prev_ = nominal_theta_;
+        nominal_theta_dot_prev_ = nominal_theta_dot_;
+      }
 
       return efforts_;
     }
@@ -281,6 +316,18 @@ namespace compliant_controllers {
     {
       q_error_ = desired_q - current_q;
       q_error_sum_ += q_error_;
+
+      // F3: q_error_sum_ trap-break — cwiseMin/cwiseMax don't recover
+      // from NaN.  See docs/diagnosis_report.md C3, F3.
+      if (!q_error_sum_.allFinite()) {
+        nan_q_error_sum_resets_.fetch_add(1, std::memory_order_relaxed);
+        ROS_WARN_THROTTLE(
+            1.0,
+            "[compliant_controllers/joint_task_space] q_error_sum_ went "
+            "non-finite — resetting to zero");
+        q_error_sum_.setZero();
+      }
+
       // Clamp the integrated error
       q_error_sum_ = q_error_sum_.cwiseMin(q_error_max_).cwiseMax(-q_error_max_);
       return q_error_sum_;

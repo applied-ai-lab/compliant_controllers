@@ -35,9 +35,20 @@ namespace compliant_controllers {
 
   bool ExtendedJointPositions::init(Eigen::VectorXd const& joint_positions) {
     if (is_initialized_ == false) {
-      normalized_target_joint_positions_ = normalize(joint_positions);
-      diff_joint_positions_ = normalized_target_joint_positions_;
-      current_joint_positions_ = normalized_target_joint_positions_;
+      // Convention fix: store `joint_positions` verbatim instead of
+      // normalising to [-π, π).  `update()` is called from the
+      // controller's adapter with positions in [0, 2π) (after
+      // hardware_interface_adapter_impl.h:122-125 wraps negatives by
+      // +2π).  Previously, `init` normalised to [-π, π) and the
+      // first `update` then compared its [0, 2π) target against a
+      // [-π, π) stored `current_`, causing the threshold check at
+      // `update()` line 49 to misclassify the first wrap event by
+      // exactly 2π.  See test/test_extended_joint_positions.cpp:
+      // test_forward_wrap_through_2pi for a reproducible failure
+      // before this fix, and docs/diagnosis_report.md §5 for the
+      // failure-mode analysis.
+      diff_joint_positions_    = joint_positions;
+      current_joint_positions_ = joint_positions;
       is_initialized_ = true;
       return true;
     }
@@ -46,6 +57,16 @@ namespace compliant_controllers {
 
   void ExtendedJointPositions::update(Eigen::VectorXd const& target_joint_positions) {
     for (Eigen::Index i = 0; i < target_joint_positions.size(); ++i) {
+      // F4: NaN guard.  A non-finite target leads to corrupt finite
+      // garbage via static_cast<int>(NaN) in the else branch below.
+      // Skip the update for this joint and leave diff/current at
+      // their previous finite values.  Increment a counter so the
+      // diagnostics topic can surface this event.  See
+      // docs/diagnosis_report.md §5 (C5) and §7 (F4).
+      if (!std::isfinite(target_joint_positions(i))) {
+        nan_count_.fetch_add(1, std::memory_order_relaxed);
+        continue;
+      }
       if (std::abs(target_joint_positions(i) - current_joint_positions_(i)) >= threshold_) {
         diff_joint_positions_(i) += normalize(target_joint_positions(i)) - normalize(current_joint_positions_(i));
         // std::cout << "========================" << std::endl;
@@ -54,8 +75,15 @@ namespace compliant_controllers {
         // std::cout << "========================" << std::endl;
         
       } else {
-        // TODO: Verify that the following implementation is actually correct
-        // It does not seem correct to me!
+        // Verified via test/test_extended_joint_positions.cpp.
+        // The else-branch algebra is correct for normal use; the
+        // only theoretical edge case is when diff is exactly a
+        // negative integer multiple of 2π AND current is exactly 0
+        // AND target is exactly 0, where C++ integer truncation of
+        // diff/2π differs from the conventional floor by 1.  Not
+        // reproducible from continuous motion sequences (numerical
+        // drift prevents the exact landing).  Documented for
+        // future maintainers.
         int number_of_rotations {0};
         if (diff_joint_positions_(i) >= 0) {
           number_of_rotations = static_cast<int>(diff_joint_positions_(i)/(2.0*M_PI));

@@ -16,6 +16,8 @@
 #define COMPLIANT_CONTROLLERS__HARDWARE_INTERFACE_ADAPTER
 #pragma once
 
+#include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -126,6 +128,9 @@ namespace compliant_controllers {
         void dynamicReconfigureCallback(JointTaskSpaceCompliantControllerConfig const& config,
           uint32_t const level);
 
+        // F6 — see joint_space/hardware_interface_adapter.h for layout.
+        void diagnosticsTimerCallback(ros::TimerEvent const& evt);
+
         std::vector<hardware_interface::JointHandle>* joint_handles_ptr_;
         std::unique_ptr<CompliantController> compliant_controller_;
         bool execute_default_command_;
@@ -137,6 +142,12 @@ namespace compliant_controllers {
           JointTaskSpaceCompliantControllerConfig> dynamic_reconfigure_server_;
         dynamic_reconfigure::Server<
           JointTaskSpaceCompliantControllerConfig>::CallbackType dynamic_reconfigure_callback_;
+
+        // F5 + F6 — NaN diagnostics.
+        std::atomic<std::uint64_t> nan_output_count_{0};
+        std::atomic<int>           nan_last_joint_{-1};
+        ros::Timer       diag_timer_;
+        ros::Publisher   diag_pub_;
     };
   }
 }

@@ -19,7 +19,9 @@
 #define COMPLIANT_CONTROLLERS__TASK_SPACE_COMPLIANT_CONTROLLER
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -225,7 +227,24 @@ namespace compliant_controllers {
 
         Eigen::Isometry3d getFrameTransform(Eigen::VectorXd const& q,
                                             pinocchio::Model::Index const& frame_idx);
-        
+
+        // ---- NaN diagnostics (see docs/diagnosis_report.md F1-F4) -------
+        [[nodiscard]] std::uint64_t getNanIntegratorResetCount() const noexcept {
+          return nan_integrator_resets_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanPinocchioThrowCount() const noexcept {
+          return nan_pinocchio_throws_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanPinocchioOutputCount() const noexcept {
+          return nan_pinocchio_output_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanQErrorSumResetCount() const noexcept {
+          return nan_q_error_sum_resets_.load(std::memory_order_relaxed);
+        }
+        [[nodiscard]] std::uint64_t getNanExtendedJointCount() const noexcept {
+          return (extended_joints_ != nullptr) ? extended_joints_->getNanCount() : 0;
+        }
+
 
       protected:
         /**\fn constructDiagonalMatrix
@@ -304,6 +323,12 @@ namespace compliant_controllers {
         Eigen::VectorXd nominal_theta_;
         Eigen::VectorXd nominal_friction_;
         Eigen::VectorXd efforts_;
+
+        // NaN counters — see docs/diagnosis_report.md F1, F2, F3.
+        std::atomic<std::uint64_t> nan_integrator_resets_{0};
+        std::atomic<std::uint64_t> nan_pinocchio_throws_{0};
+        std::atomic<std::uint64_t> nan_pinocchio_output_{0};
+        std::atomic<std::uint64_t> nan_q_error_sum_resets_{0};
     };
   } // namespace task_space
 } // compliant_controller

@@ -120,7 +120,7 @@ namespace compliant_controllers {
        *   The normalized joint angle [-pi, pi)
       */
       [[nodiscard]]
-      static constexpr double normalize(double const joint_angle) noexcept;
+      static double normalize(double const joint_angle) noexcept;
 
       /**\fn normalize
        * \brief

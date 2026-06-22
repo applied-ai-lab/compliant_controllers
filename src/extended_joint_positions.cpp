@@ -64,7 +64,7 @@ namespace compliant_controllers {
     return;
   }
 
-  constexpr double ExtendedJointPositions::normalize(double const joint_angle) noexcept {
+  double ExtendedJointPositions::normalize(double const joint_angle) noexcept {
     // Taken from  https://stackoverflow.com/questions/11980292/how-to-wrap-around-a-range
     double output = std::fmod(joint_angle + M_PI, 2.0*M_PI);
     if (output < 0.0) {

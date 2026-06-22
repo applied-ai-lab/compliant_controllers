@@ -8,7 +8,6 @@ set(BUILD_TESTS ON)
 
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
-  driver_base
   dynamic_reconfigure
   hardware_interface
   joint_trajectory_controller
@@ -27,7 +26,6 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   CATKIN_DEPENDS
   controller_interface
-  driver_base
   dynamic_reconfigure
   hardware_interface
   joint_trajectory_controller

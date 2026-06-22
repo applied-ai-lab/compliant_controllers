@@ -1,0 +1,257 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\round}{\operatorname{round}}
+\newcommand{\clip}{\operatorname{clip}}
+\DeclareMathOperator{\Nrm}{\mathcal{N}}
+
+\title{Continuous--Joint Wraparound in the Compliant Effort Controller\\
+\large A mathematical analysis of the ``random spinning'' failure}
+\author{compliant\_controllers --- Kinova Gen3 (7\,DoF)}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note derives, from first principles, why a joint can occasionally
+``run away'' (spin a full turn) when the arm is driven by the compliant
+\emph{effort} controller. The mechanism is a mismatch between the angle
+convention used for the \emph{measured} state and the convention used for
+the \emph{desired} (commanded) state: the measured state is unwrapped into
+a continuous frame with a per--joint integer offset, while the desired
+state is consumed in the trajectory controller's own (raw) frame. The
+resulting constant $2\pi$ position error is multiplied by the joint
+stiffness and applied as an \emph{unclamped} torque, which drives the
+joint around. We give the algebra, identify the exact source terms in the
+code, separate what is verified from what is assumed, and state the fix.
+\end{abstract}
+
+\tableofcontents
+
+\section{Scope and honesty notes}
+
+The controller specialises \texttt{hardware\_interface::EffortJointInterface}
+only; there is no position/velocity variant. Hence the analysis below applies
+exactly when the arm is in \emph{effort control mode}. In any position mode the
+control law of Section~\ref{sec:law} does not run and the robot's onboard
+controller resolves wraparound, which is consistent with the observation that
+the symptom appears only in effort mode.
+
+Two facts are \textbf{verified directly from the source tree}:
+\begin{itemize}
+  \item the measured state receives a one--shot $+2\pi$ shift and is then
+        unwrapped into a continuous frame (Section~\ref{sec:ext});
+  \item the desired state is consumed \emph{raw} and the proportional
+        position error is \emph{unclamped} (Section~\ref{sec:law}).
+\end{itemize}
+
+One ingredient is \textbf{assumed and flagged for verification}
+(Section~\ref{sec:jtc}): the precise angle convention of (a) the upstream
+\texttt{joint\_trajectory\_controller} for \texttt{continuous} joints and
+(b) the kortex hardware driver's reported range. These determine
+\emph{how often} the failure offset is non--zero, not \emph{whether} the
+mechanism exists.
+
+\section{Notation}
+
+For joint $i$ (the \texttt{continuous} joints on the Gen3 are
+$i\in\{1,3,5,7\}$):
+\begin{align*}
+\phi^m_i(t)\in\R &\quad\text{true (unbounded) measured physical angle},\\
+\phi^d_i(t)\in\R &\quad\text{true (unbounded) desired physical angle},\\
+q^{hw}_i(t)      &\quad\text{hardware reading }\equiv\phi^m_i \!\!\pmod{2\pi},\ \text{wrapped},\\
+\Delta t         &\quad\text{control period},\qquad \Theta=\tfrac{3\pi}{2}\ \text{wrap threshold}.
+\end{align*}
+The normalisation used by the code
+(\texttt{src/extended\_joint\_positions.cpp:96}) is
+\begin{equation}
+\Nrm(x)=\big((x+\pi)\bmod 2\pi\big)-\pi\ \in[-\pi,\pi).
+\end{equation}
+The adapter shift (\texttt{hardware\_interface\_adapter\_impl.h:140}),
+applied once per cycle to every joint, is
+\begin{equation}
+\label{eq:shift}
+\tilde q_i = q^{hw}_i + 2\pi\,\big[\,q^{hw}_i<0\,\big],
+\qquad \tilde q_i\equiv\phi^m_i\!\!\pmod{2\pi}.
+\end{equation}
+
+\section{The extended (measured) position}
+\label{sec:ext}
+
+With stored raw value $c_i$ (\texttt{current\_}) and accumulator
+$\theta_i$ (\texttt{diff\_}), one \texttt{update(t)} performs
+\begin{equation}
+\label{eq:update}
+\theta_i \leftarrow
+\begin{cases}
+\theta_i+\Nrm(t)-\Nrm(c_i), & |t-c_i|\ge\Theta \quad(\text{``wrap''}),\\[4pt]
+2\pi\big\lfloor \theta_i/2\pi\big\rfloor + t, & |t-c_i|<\Theta \quad(\text{``no wrap''}),
+\end{cases}
+\qquad c_i\leftarrow t .
+\end{equation}
+The integer count in the source --- \texttt{static\_cast<int>($\theta/2\pi$)}
+with a $-1$ correction for negatives --- equals $\lfloor\theta_i/2\pi\rfloor$.
+
+\paragraph{Invariant.}
+As long as the per--cycle step stays small, $\theta_i(t)$ is continuous and
+\begin{equation}
+\theta_i(t)\equiv\tilde q_i(t)\equiv\phi^m_i(t)\pmod{2\pi}.
+\end{equation}
+Two continuous functions congruent mod $2\pi$ differ by a fixed integer
+multiple of $2\pi$, frozen at initialisation:
+\begin{equation}
+\label{eq:k0}
+\boxed{\;\theta_i(t)=\phi^m_i(t)+2\pi k_i^0,
+\qquad k_i^0=\frac{\tilde q_i(0)-\phi^m_i(0)}{2\pi}\in\Z.\;}
+\end{equation}
+From \eqref{eq:shift}, $k_i^0=\big[\,q^{hw}_i(0)<0\,\big]$ at start
+(plus any later $\pm1$ injected by a misfire, Section~\ref{sec:misfire}).
+
+\section{The desired position and the control law}
+\label{sec:law}
+
+The desired trajectory state is copied \emph{raw} into the controller
+(\texttt{hardware\_interface\_adapter\_impl.h:149}); it is \emph{not}
+passed through \eqref{eq:shift} or \eqref{eq:update}. Write its frame as
+\begin{equation}
+\label{eq:qd}
+q^d_i(t)=\phi^d_i(t)+2\pi\,m_i(t),
+\end{equation}
+where $m_i(t)\in\Z$ is the (integer) branch chosen by the trajectory
+controller's own unwrapping convention (Section~\ref{sec:jtc}).
+
+The effort law (\texttt{src/joint\_space/controller.cpp:196}) is
+\begin{equation}
+\bm\tau=-K\big(\bm\theta^{\mathrm{nom}}_{\mathrm{prev}}-\bm q^d-K_s^{-1}\bm g\big)
+        -D\big(\dot{\bm\theta}^{\mathrm{nom}}_{\mathrm{prev}}-\dot{\bm q}^d\big),
+\end{equation}
+with $K$ the joint stiffness, $D$ the damping, $K_s^{-1}$ the inverse joint
+stiffness and $\bm g$ gravity. The proportional position error is
+$\bm e=\bm\theta^{\mathrm{nom}}_{\mathrm{prev}}-\bm q^d$. Only the
+\emph{integral} state $\bm q_{\mathrm{error,sum}}$ is clamped
+(\texttt{controller.cpp:273}); $\bm e$ itself is \textbf{not} clamped.
+
+\section{Error decomposition}
+
+In tracking $\theta^{\mathrm{nom}}_i\approx\theta_i$, so combining
+\eqref{eq:k0} and \eqref{eq:qd},
+\begin{align}
+e_i &= \theta_i - q^d_i
+     = \big(\phi^m_i+2\pi k_i^0\big)-\big(\phi^d_i+2\pi m_i\big)\notag\\
+\label{eq:err}
+    &= \boxed{\;\underbrace{\big(\phi^m_i-\phi^d_i\big)}_{\text{true tracking error}}
+        \;+\;2\pi\big(k_i^0-m_i(t)\big).\;}
+\end{align}
+The first term is what we want. The second is a spurious integer number of
+full turns, present whenever the measured frame ($k_i^0$, set by the
+$+2\pi$ shift) and the desired frame ($m_i$, set by the trajectory
+controller) disagree.
+
+\section{Why it spins, and only in effort mode}
+
+The proportional torque on joint $i$ is
+\begin{equation}
+\tau_i \supset -K_{ii} e_i
+   = -K_{ii}\big(\phi^m_i-\phi^d_i\big)
+     \;\underbrace{-\,2\pi K_{ii}\big(k_i^0-m_i(t)\big)}_{\tau_i^{\mathrm{spurious}}}.
+\end{equation}
+Each unit of $k_i^0-m_i$ contributes a \emph{constant} torque of magnitude
+$2\pi K_{ii}$ in a fixed direction. Because $\bm e$ is unclamped, this
+reaches the actuator in full. As the joint accelerates, $\phi^m_i$ runs
+away but $\theta_i$ tracks it continuously via \eqref{eq:update}, so $e_i$
+does \emph{not} shrink --- the ``unwinding'' never completes and the joint
+sustains rotation. In a position mode this law never executes, hence the
+effort--mode exclusivity.
+
+\section{The threshold misfire (the intermittency)}
+\label{sec:misfire}
+
+The wrap branch of \eqref{eq:update} triggers on $|t-c_i|\ge\Theta=\tfrac{3\pi}{2}$.
+Let the effective per--cycle increment be
+$\Delta_i=|\dot\phi^m_i|\,\Delta t_{\mathrm{eff}}$.
+\begin{itemize}
+  \item \textbf{Correct} unwrapping requires $\Delta_i<\tfrac{\pi}{2}$
+        (a genuine $2\pi$ wrap then yields $|t-c_i|=2\pi-\Delta_i\ge\tfrac{3\pi}{2}$).
+  \item A \textbf{false wrap} occurs when $\Delta_i\ge\tfrac{3\pi}{2}$ with no
+        boundary crossing: a large in--band step is misread as a wrap, and
+        \begin{equation}
+        \theta_i\mathrel{+}=\Nrm(t)-\Nrm(c_i)=(t-c_i)\mp 2\pi,
+        \end{equation}
+        injecting $\mp2\pi$, i.e. flipping $k_i^0\to k_i^0\mp1$ in
+        \eqref{eq:k0}--\eqref{eq:err}.
+\end{itemize}
+With the Gen3 limit $|\dot\phi^m_i|\le 1.3963\,\mathrm{rad/s}$, a false wrap
+needs $\Delta t_{\mathrm{eff}}\ge\frac{3\pi/2}{1.3963}\approx 3.4\,\mathrm{s}$ in a
+single cycle --- i.e. a dropped or severely late real--time cycle. This is
+intermittent by nature and accounts for ``every now and then.''
+
+\section{The unverified link: trajectory and driver conventions}
+\label{sec:jtc}
+
+Equation~\eqref{eq:err} shows the offset is $k_i^0-m_i(t)$. The value of
+$m_i(t)$ depends on the upstream
+\texttt{joint\_trajectory\_controller}: for \texttt{continuous} joints
+(\texttt{angle\_wraparound = true}) it shifts each waypoint by the multiple
+of $2\pi$ that makes the path continuous with the \emph{current measured
+position}, then samples a continuous desired. Thus $m_i$ is a (slowly
+varying / piecewise constant) integer chosen about the \emph{raw}
+$q^{hw}_i$ origin --- \emph{not} about the $+2\pi$--shifted, extended
+$\theta_i$ origin used by the compliant controller. The two origins differ
+by exactly $k_i^0$ from \eqref{eq:shift}.
+
+How often $k_i^0-m_i\neq 0$ depends on the kortex driver's reported range:
+\begin{itemize}
+  \item driver reports $[0,2\pi)$: the shift \eqref{eq:shift} never fires,
+        $k_i^0=0$ initially, and the residual failures come from the
+        misfire/drift path of Section~\ref{sec:misfire};
+  \item driver reports $[-\pi,\pi)$: the shift fires for any joint sitting
+        negative, giving a near--deterministic $2\pi$ offset right after start.
+\end{itemize}
+\textbf{To verify:} the installed JTC source (waypoint wraparound origin)
+and the kortex hardware interface's reported joint range. These set the
+\emph{frequency}, not the \emph{existence}, of the failure.
+
+\section{Fix}
+
+Two independent changes; either alone removes most of the risk, both
+together close it.
+
+\paragraph{(1) Frame--consistent desired.}
+Before differencing, replace $q^d_i$ with the representative congruent to
+$q^d_i$ and nearest to $\theta^{\mathrm{nom}}_i$:
+\begin{equation}
+\hat q^d_i = q^d_i + 2\pi\,\round\!\left(\frac{\theta^{\mathrm{nom}}_i-q^d_i}{2\pi}\right),
+\qquad
+e_i=\theta^{\mathrm{nom}}_i-\hat q^d_i\in[-\pi,\pi].
+\end{equation}
+This cancels the $2\pi(k_i^0-m_i)$ term in \eqref{eq:err} identically,
+leaving $e_i=\Nrm(\phi^m_i-\phi^d_i)$ --- the true error taken the short way.
+
+\paragraph{(2) Clamp the proportional error.}
+As an independent safety net, bound $\bm e$ the way the integral term is
+already bounded:
+\begin{equation}
+e_i \leftarrow \clip\big(e_i,\,-e^{\max}_i,\,e^{\max}_i\big),
+\end{equation}
+so even a residual misfire can never command more than $K_{ii}e^{\max}_i$.
+
+\paragraph{(3) Robuster wrap detection (optional).}
+Replace the fixed threshold $\Theta=\tfrac{3\pi}{2}$ by a velocity/period
+aware test, e.g.\ flag a wrap only when $|t-c_i|>2\pi-\kappa$ with
+$\kappa$ a margin larger than the worst plausible $\Delta_i$, removing the
+false--wrap path of Section~\ref{sec:misfire}.
+
+The same pattern (measured unwrapped, desired raw, unclamped $\bm e$)
+exists in the \texttt{joint\_task\_space} and \texttt{task\_space}
+controllers and should receive the same treatment.
+
+\end{document}

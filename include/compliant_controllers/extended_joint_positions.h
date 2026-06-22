@@ -37,10 +37,8 @@ namespace compliant_controllers {
        *
        * \param[in] number_of_dof
        *   Degrees of freedom of all of the joints combined
-       * \param[in] threshold
-       *   Threshold for the joint angles
       */
-      ExtendedJointPositions(unsigned int const number_of_dof, double const threshold = 3*M_PI/2);
+      ExtendedJointPositions(unsigned int const number_of_dof);
       ExtendedJointPositions() = delete;
       ExtendedJointPositions(ExtendedJointPositions const&) = default;
       ExtendedJointPositions& operator= (ExtendedJointPositions const&) = default;
@@ -53,24 +51,23 @@ namespace compliant_controllers {
        * \warning
        *   Only works if called for the first time, else the value is discarded
        *
-       * \param[in] joint_positions
+       * \param[in] initial_joint_positions
        *   Joint positions that the class should be initialized with
        * \return
        *   Boolean value indicating success (true) or failure (false)
       */
       [[nodiscard]]
-      bool init(Eigen::VectorXd const& joint_positions);
+      bool init(Eigen::VectorXd const& initial_joint_positions);
 
       /**\fn update
        * \brief
-       *   Compute the new joint positions. For getting the estimated positions call the getter function.
+       *   Update the continuous (unwrapped) joint positions from the latest
+       *   measured reading. For getting the estimated positions call the getter function.
        *
-       * \param[in] target_joint_positions
-       *   The desired target 
-       * \return
-       *   Boolean value indicating success (true) or failure (false)
+       * \param[in] measured_joint_positions
+       *   The latest measured joint positions (wrapped sensor readings)
       */
-      void update(Eigen::VectorXd const& target_joint_positions);
+      void update(Eigen::VectorXd const& measured_joint_positions);
 
       /**\fn getPositions
        * \brief
@@ -81,7 +78,7 @@ namespace compliant_controllers {
       */
       [[nodiscard]]
       Eigen::VectorXd getPositions() const noexcept {
-        return diff_joint_positions_;
+        return unwrapped_joint_positions_;
       }
 
       /**\fn isInitialized
@@ -100,7 +97,7 @@ namespace compliant_controllers {
        * \brief
        *   Diagnostic accessor — number of times update() received a
        *   non-finite target and skipped the per-joint update to avoid
-       *   propagating NaN into diff_joint_positions_.  See F4 in
+       *   propagating NaN into unwrapped_joint_positions_.  See F4 in
        *   docs/diagnosis_report.md.
        *
        * \return
@@ -139,11 +136,9 @@ namespace compliant_controllers {
 
       bool is_initialized_;
       unsigned int number_of_dof_;
-      double threshold_;
 
-      Eigen::VectorXd normalized_target_joint_positions_;
-      Eigen::VectorXd diff_joint_positions_;
-      Eigen::VectorXd current_joint_positions_;
+      Eigen::VectorXd unwrapped_joint_positions_;
+      Eigen::VectorXd previous_joint_positions_;
 
       // Diagnostic counter for non-finite target inputs.  See F4 in
       // docs/diagnosis_report.md.  Atomic so the read in

@@ -193,7 +193,20 @@ namespace compliant_controllers {
       }
 
       // Gravity compensation is performed inside the hardware interface
-      task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_) - 
+      //
+      // SUGGESTED FIX (frame consistency — deliberately NOT applied here):
+      // the proportional position error (nominal_theta_prev_ - desired_positions_)
+      // is used unwrapped. The measured side is shifted into [0, 2*pi) by the
+      // hardware-interface adapter while the desired is consumed raw, so a joint
+      // resting at a negative driver angle gives a spurious ~2*pi error that,
+      // times joint_k_matrix_, commands a large torque -> "spin". Wrapping ONLY
+      // that sub-term into [-pi, pi) cancels the offset and is a no-op whenever
+      // |error| <= pi (i.e. in normal tracking), e.g.:
+      //   const auto e = ExtendedJointPositions::normalize(nominal_theta_prev_ - desired_positions_);
+      //   task_effort_ = -joint_k_matrix_*(e - inverse_joint_stiffness_matrix_*gravity_) - ...
+      // (requires making ExtendedJointPositions::normalize public). See the
+      // continuous-joint wraparound analysis / implementation plan.
+      task_effort_ = -joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_) -
                       joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 
       // Time step smaller than period.toSec() potentially because of too small rotor inertia matrix

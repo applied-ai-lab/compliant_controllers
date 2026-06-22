@@ -1,5 +1,5 @@
 /**
- * \file extended_joint_position.cpp
+ * \file extended_joint_positions.cpp
  * \mainpage
  *   Helpers for joint position calculations
  * 
@@ -18,58 +18,49 @@
 
 #include <cmath>
 
-#include <iostream>
 #include <Eigen/Eigen>
 
 
 namespace compliant_controllers {
 
-  ExtendedJointPositions::ExtendedJointPositions(unsigned int const number_of_dof,
-      double const threshold)
-  : is_initialized_{false}, number_of_dof_{number_of_dof}, threshold_{threshold} {
-    normalized_target_joint_positions_.resize(number_of_dof_, 1);
-    diff_joint_positions_.resize(number_of_dof_, 1);
-    current_joint_positions_.resize(number_of_dof_, 1);
+  ExtendedJointPositions::ExtendedJointPositions(unsigned int const number_of_dof)
+  : is_initialized_{false}, number_of_dof_{number_of_dof} {
+    unwrapped_joint_positions_.resize(number_of_dof_, 1);
+    previous_joint_positions_.resize(number_of_dof_, 1);
     return;
   }
 
-  bool ExtendedJointPositions::init(Eigen::VectorXd const& joint_positions) {
+  bool ExtendedJointPositions::init(Eigen::VectorXd const& initial_joint_positions) {
     if (is_initialized_ == false) {
-      normalized_target_joint_positions_ = normalize(joint_positions);
-      diff_joint_positions_    = normalized_target_joint_positions_;
-      current_joint_positions_ = normalized_target_joint_positions_;
+      unwrapped_joint_positions_ = normalize(initial_joint_positions);
+      previous_joint_positions_ = unwrapped_joint_positions_;
       is_initialized_ = true;
       return true;
     }
     return false;
   }
 
-  void ExtendedJointPositions::update(Eigen::VectorXd const& target_joint_positions) {
-    for (Eigen::Index i = 0; i < target_joint_positions.size(); ++i) {
-      // F4: NaN guard.  A non-finite target leads to corrupt finite
-      // garbage via static_cast<int>(NaN) in the else branch below.
-      // Skip the update for this joint and leave diff/current at
-      // their previous finite values.  Increment a counter so the
+  void ExtendedJointPositions::update(Eigen::VectorXd const& measured_joint_positions) {
+    for (Eigen::Index i = 0; i < measured_joint_positions.size(); ++i) {
+      // F4: NaN guard.  A non-finite reading is skipped entirely.  Because
+      // previous_joint_positions_ is updated INSIDE the loop (below), the
+      // per-joint state is left at its previous finite values and recovers
+      // cleanly on the next finite reading.  Increment a counter so the
       // diagnostics topic can surface this event.  See
       // docs/diagnosis_report.md §5 (C5) and §7 (F4).
-      if (!std::isfinite(target_joint_positions(i))) {
+      if (!std::isfinite(measured_joint_positions(i))) {
         nan_count_.fetch_add(1, std::memory_order_relaxed);
         continue;
       }
-      if (std::abs(target_joint_positions(i) - current_joint_positions_(i)) >= threshold_) {
-        diff_joint_positions_(i) += normalize(target_joint_positions(i)) - normalize(current_joint_positions_(i));
-      } else {
-        int number_of_rotations {0};
-        if (diff_joint_positions_(i) >= 0) {
-          number_of_rotations = static_cast<int>(diff_joint_positions_(i)/(2.0*M_PI));
-        }
-        else {
-          number_of_rotations = static_cast<int>(diff_joint_positions_(i)/(2.0*M_PI)) - 1;
-        }
-        diff_joint_positions_(i) = number_of_rotations*(2.0*M_PI) + target_joint_positions(i);
-      }
+      // Continuous unwrap (std::unwrap): accumulate the wrapped delta between
+      // the new reading and the previous one.  normalize() maps the delta
+      // into [-pi, pi), so a 0/2pi seam crossing is read as the small
+      // physical motion it really is, and the result is independent of which
+      // 2pi-congruent representative the reading uses.
+      double const delta {normalize(measured_joint_positions(i) - previous_joint_positions_(i))};
+      unwrapped_joint_positions_(i) += delta;
+      previous_joint_positions_(i) = measured_joint_positions(i);
     }
-    current_joint_positions_ = target_joint_positions;
     return;
   }
 

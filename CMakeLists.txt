@@ -125,5 +125,14 @@ if(BUILD_TESTS)
 
   target_compile_definitions(${PROJECT_NAME}_joint_taskspace_ctrl_test PUBLIC PATH_TO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
+  # Standalone unit tests for ExtendedJointPositions.  Links the real
+  # implementation; only needs Eigen (no pinocchio / catkin libs).
+  add_executable(${PROJECT_NAME}_unwrapped_joint_positions_test
+                    test/test_extended_joint_positions.cpp
+                    src/extended_joint_positions.cpp)
+  target_include_directories(${PROJECT_NAME}_unwrapped_joint_positions_test PRIVATE
+                    include
+                    ${EIGEN3_INCLUDE_DIRS})
+
 endif()
 

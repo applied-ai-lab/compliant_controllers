@@ -270,7 +270,7 @@ namespace compliant_controllers {
 
       // Gravity compensation is performed inside the hardware interface
       // The jacobian includes derivatives for the gripper which does not affect the manipulator so these are ignored
-      task_effort_.noalias() = jacobian_.block(0, 0, 6, num_controlled_dofs_).transpose() * (-task_k_matrix_ * taskspace_error_ 
+      task_effort_.noalias() = jacobian_.block(0, 0, 6, num_controlled_dofs_).transpose() * (-task_k_matrix_ * taskspace_error_
                                                                                             -task_d_matrix_ * jacobian_.block(0, 0, 6, num_controlled_dofs_) * (nominal_theta_dot_prev_ - desired_state.velocities))
                               - joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_)
                               - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);

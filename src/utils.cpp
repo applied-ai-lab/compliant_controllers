@@ -14,6 +14,7 @@
 #include "compliant_controllers/utils.h"
 
 #include <cmath>
+#include <stdexcept>
 
 // Pinocchio has to be included before ROS
 // See https://github.com/wxmerkt/pinocchio_ros_example
@@ -26,6 +27,12 @@ namespace compliant_controllers {
 
   Eigen::VectorXd joint_ros_to_pinocchio(Eigen::VectorXd const& q, pinocchio::Model const& model) {
     Eigen::VectorXd q_pin {model.nq};
+    joint_ros_to_pinocchio(q, model, q_pin);
+    return q_pin;
+  }
+
+  void joint_ros_to_pinocchio(Eigen::VectorXd const& q, pinocchio::Model const& model, Eigen::VectorXd& q_pin) {
+    if (q.size() != model.nv || q_pin.size() != model.nq) throw std::invalid_argument("Pinocchio configuration size");
     for (std::size_t i = 0; i < model.joints.size() - 1; i++) {
       pinocchio::JointIndex const jidx {model.getJointId(model.names[i + 1])};
       int const qidx {model.idx_qs[jidx]};
@@ -37,7 +44,6 @@ namespace compliant_controllers {
         q_pin(qidx) = q(i);
       }
     }
-    return q_pin;
   }
 
 } // compliant_controllers

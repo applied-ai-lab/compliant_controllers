@@ -1,0 +1,15 @@
+# Initial low-stiffness TORQUE profile; commissioning candidate, not hardware-qualified gains.
+# Arrays use the controller's configured joint order. Task axes are world-aligned; quaternion
+# orientation error is retained from ROS1. Integral observer action starts disabled.
+/**:
+  ros__parameters:
+    joint_stiffness: [4000.0, 4000.0, 4000.0, 4000.0, 3500.0, 3500.0, 3500.0]
+    rotor_inertia: [0.3, 0.3, 0.3, 0.3, 0.18, 0.18, 0.18]
+    joint_k: [4.0, 4.0, 4.0, 4.0, 2.0, 2.0, 2.0]
+    joint_d: [2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0]
+    task_k: [100.0, 100.0, 100.0, 10.0, 10.0, 10.0]
+    task_d: [10.0, 10.0, 10.0, 1.0, 1.0, 1.0]
+    friction_l: [60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0]
+    friction_lp: [4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0]
+    friction_li: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    max_joint_error: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

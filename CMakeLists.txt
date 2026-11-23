@@ -1,136 +1,46 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.16)
 project(compliant_controllers)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-set(BUILD_TESTS ON)
-
-find_package(catkin REQUIRED COMPONENTS
-  controller_interface
-  dynamic_reconfigure
-  hardware_interface
-  joint_trajectory_controller
-  pluginlib
-  roscpp
-  std_msgs
-)
-find_package(pinocchio REQUIRED)
-
-generate_dynamic_reconfigure_options(
-  config/JointSpaceParams.cfg
-  config/JointTaskSpaceParams.cfg
-  config/TaskSpaceParams.cfg
-)
-
-catkin_package(
-  CATKIN_DEPENDS
-  controller_interface
-  dynamic_reconfigure
-  hardware_interface
-  joint_trajectory_controller
-  pluginlib
-  roscpp
-  std_msgs
-)
+find_package(ament_cmake REQUIRED)
+find_package(controller_interface REQUIRED)
+find_package(hardware_interface REQUIRED)
+find_package(joint_trajectory_controller REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(realtime_tools REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-
-catkin_install_python(PROGRAMS
-    scripts/switch_mode.py
-    scripts/test_controller_server.py
-    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIRS}
-)
-link_directories(
-  ${catkin_LIBRARY_DIRS}
-)
-
-# Compiled as three separate libraries to avoid linker error with joint_trajectory_controller internals
-add_library(joint_space_compliant_controller
-  src/joint_space/compliant_controllers.cpp
-  src/joint_space/controller.cpp
-  src/extended_joint_positions.cpp
-  src/utils.cpp
-)
-target_compile_definitions(joint_space_compliant_controller PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
-target_link_libraries(joint_space_compliant_controller
-  ${catkin_LIBRARIES}
-  pinocchio::pinocchio
-)
-add_dependencies(joint_space_compliant_controller ${PROJECT_NAME}_gencfg)
-
-add_library(joint_task_space_compliant_controller
-  src/joint_task_space/compliant_controllers.cpp
-  src/joint_task_space/controller.cpp
-  src/extended_joint_positions.cpp
-  src/utils.cpp
-)
-target_compile_definitions(joint_task_space_compliant_controller PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
-target_link_libraries(joint_task_space_compliant_controller
-  ${catkin_LIBRARIES}
-  pinocchio::pinocchio
-)
-add_dependencies(joint_task_space_compliant_controller ${PROJECT_NAME}_gencfg)
-
-add_library(task_space_compliant_controller
-  src/task_space/compliant_controllers.cpp
-  src/task_space/controller.cpp
-  src/extended_joint_positions.cpp
-  src/utils.cpp
-)
-target_compile_definitions(task_space_compliant_controller PRIVATE ${PINOCCHIO_CFLAGS_OTHER})
-target_link_libraries(task_space_compliant_controller
-  ${catkin_LIBRARIES}
-  pinocchio::pinocchio
-)
-add_dependencies(task_space_compliant_controller ${PROJECT_NAME}_gencfg)
-
-install(TARGETS joint_space_compliant_controller joint_task_space_compliant_controller task_space_compliant_controller
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-)
-install(DIRECTORY config/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
-)
-install(DIRECTORY launch/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
-)
-
-if(BUILD_TESTS)
-
-  add_library(joint_task_space_compliant_controller_test
-    src/joint_task_space/controller.cpp
-    src/extended_joint_positions.cpp
-    src/utils.cpp
-  )
-
-  add_executable(${PROJECT_NAME}_joint_taskspace_ctrl_test 
-                    test/test_task_space_control.cpp)
-  
-  target_link_libraries(${PROJECT_NAME}_joint_taskspace_ctrl_test 
-                          joint_task_space_compliant_controller_test
-                          ${catkin_LIBRARIES}
-                          pinocchio::pinocchio)
-
-  target_compile_definitions(${PROJECT_NAME}_joint_taskspace_ctrl_test PUBLIC PATH_TO_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-
-  # Standalone unit tests for ExtendedJointPositions.  Links the real
-  # implementation; only needs Eigen (no pinocchio / catkin libs).
-  add_executable(${PROJECT_NAME}_unwrapped_joint_positions_test
-                    test/test_extended_joint_positions.cpp
-                    src/extended_joint_positions.cpp)
-  target_include_directories(${PROJECT_NAME}_unwrapped_joint_positions_test PRIVATE
-                    include
-                    ${EIGEN3_INCLUDE_DIRS})
-
+find_package(pinocchio REQUIRED)
+add_library(compliant_core SHARED src/joint_task_space/controller.cpp src/extended_joint_positions.cpp src/utils.cpp src/model.cpp)
+target_include_directories(compliant_core PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
+target_link_libraries(compliant_core PUBLIC Eigen3::Eigen pinocchio::pinocchio)
+add_library(compliant_controller SHARED src/ros2_controller.cpp)
+target_link_libraries(compliant_controller compliant_core)
+ament_target_dependencies(compliant_controller controller_interface hardware_interface joint_trajectory_controller pluginlib rclcpp realtime_tools std_msgs trajectory_msgs)
+pluginlib_export_plugin_description_file(controller_interface controller_plugins.xml)
+install(TARGETS compliant_core compliant_controller EXPORT export_compliant_controllers LIBRARY DESTINATION lib ARCHIVE DESTINATION lib RUNTIME DESTINATION bin)
+install(FILES include/compliant_controllers/robot_state.h include/compliant_controllers/utils.h
+  include/compliant_controllers/extended_joint_positions.h include/compliant_controllers/model.hpp
+  include/compliant_controllers/ros2_controller.hpp DESTINATION include/compliant_controllers)
+install(FILES include/compliant_controllers/joint_task_space/controller.h DESTINATION include/compliant_controllers/joint_task_space)
+install(DIRECTORY config/ros2 DESTINATION share/${PROJECT_NAME}/config)
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_core test/ros2/test_core.cpp)
+  target_link_libraries(test_core compliant_core)
+  target_compile_definitions(test_core PRIVATE TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test")
+  ament_add_gtest(test_reference test/ros2/test_reference.cpp)
+  target_link_libraries(test_reference compliant_controller)
+  ament_target_dependencies(test_reference controller_interface trajectory_msgs joint_trajectory_controller)
+  target_compile_definitions(test_reference PRIVATE TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test")
+  add_executable(test_extended_joint_positions test/test_extended_joint_positions.cpp src/extended_joint_positions.cpp)
+  target_include_directories(test_extended_joint_positions PRIVATE include)
+  target_link_libraries(test_extended_joint_positions Eigen3::Eigen)
+  add_test(NAME extended_joint_positions COMMAND test_extended_joint_positions)
 endif()
-
+ament_export_targets(export_compliant_controllers HAS_LIBRARY_TARGET)
+ament_export_dependencies(Eigen3 pinocchio controller_interface hardware_interface joint_trajectory_controller
+  pluginlib rclcpp realtime_tools std_msgs trajectory_msgs)
+ament_package()

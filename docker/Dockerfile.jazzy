@@ -1,0 +1,21 @@
+FROM ros:jazzy-ros-base@sha256:5147d3ae250ce754afd399f6bfec15b33dd4e473ca357e30432a3182031bfad6
+COPY ros2-snapshot.sources /etc/apt/sources.list.d/ros2-snapshot.sources
+RUN apt-get purge -y ros2-apt-source \
+ && rm -f /etc/apt/sources.list.d/ros2.sources /etc/apt/sources.list.d/ros2.list \
+ && printf 'Package: ros-jazzy-*\nPin: origin snapshots.ros.org\nPin-Priority: 1001\n' > /etc/apt/preferences.d/frank-snapshot \
+ && apt-get update \
+ && apt-get install -y --allow-downgrades --no-install-recommends \
+    build-essential cmake git python3-pytest python3-numpy python3-scipy python3-yaml \
+    ros-jazzy-controller-manager ros-jazzy-controller-interface ros-jazzy-hardware-interface ros-jazzy-ros2controlcli \
+    ros-jazzy-joint-trajectory-controller ros-jazzy-joint-state-broadcaster \
+    ros-jazzy-velocity-controllers ros-jazzy-pinocchio ros-jazzy-realtime-tools \
+    ros-jazzy-ament-cmake-gtest ros-jazzy-ament-cmake-pytest ros-jazzy-xacro \
+    ros-jazzy-robot-state-publisher ros-jazzy-ros2-control-test-assets \
+    ros-jazzy-flir-ptu-description ros-jazzy-realsense2-description \
+    ros-jazzy-picknik-reset-fault-controller ros-jazzy-picknik-twist-controller \
+    ros-jazzy-ros2-controllers-test-nodes libyaml-cpp-dev \
+    ros-jazzy-proxsuite ros-jazzy-moveit-core ros-jazzy-tf2-eigen \
+    ros-jazzy-dynamixel-sdk pybind11-dev python3-serial \
+ && rm -rf /var/lib/apt/lists/*
+ENV ROS_DOMAIN_ID=83 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+WORKDIR /ws

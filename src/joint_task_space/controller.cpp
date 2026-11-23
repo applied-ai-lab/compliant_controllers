@@ -31,7 +31,7 @@
 #include <pinocchio/multibody/fwd.hpp>
 
 #include <Eigen/Eigen>
-#include <ros/ros.h>
+#include <stdexcept>
 
 #include "compliant_controllers/extended_joint_positions.h"
 #include "compliant_controllers/robot_state.h"
@@ -49,19 +49,16 @@ namespace compliant_controllers {
       num_controlled_dofs_{num_controlled_dofs}, apply_gravity_{apply_gravity}
       {
 
-      // Check to see if end effector link exits in the chain
-      if(!robot_model_->existFrame(end_effector_link))
-      {
-          std::cout << "The end effector link does not exist in the model. Link name: " 
-          << end_effector_link << std::endl;
-      }
-      else
-      {
-          end_effector_index_ = robot_model_->getFrameId(end_effector_link);
-      }
-
+      if (robot_model_->nv != num_controlled_dofs_ ||
+          robot_model_->joints.size() != static_cast<std::size_t>(num_controlled_dofs_ + 1))
+        throw std::invalid_argument("controller needs a reduced model with only its arm joints");
+      if (!robot_model_->existFrame(end_effector_link))
+        throw std::invalid_argument("end effector frame not in model: " + end_effector_link);
+      end_effector_index_ = robot_model_->getFrameId(end_effector_link);
+      for (pinocchio::JointIndex j = 1; j < robot_model_->joints.size(); ++j)
+        continuous_joints_.push_back(robot_model_->nqs[j] == 2);
       setDefaultValues();
-      extended_joints_ = std::make_unique<ExtendedJointPositions>(num_controlled_dofs_);
+      extended_joints_ = std::make_unique<ExtendedJointPositions>(num_controlled_dofs_, continuous_joints_);
       // TODO: Potentially pre-allocate also other structures
       return;
     }
@@ -84,12 +81,17 @@ namespace compliant_controllers {
       tempMat3d_ = Eigen::Matrix3d::Zero();
       tempIsometry3d_ = Eigen::Isometry3d::Identity();
       jacobian_ = Eigen::MatrixXd::Zero(6, robot_model_->nv);
+      pinocchio_positions_.setZero(robot_model_->nq);
+      for (auto* v : {&last_desired_positions_, &nominal_theta_prev_, &nominal_theta_dot_prev_,
+          &desired_positions_, &current_theta_, &gravity_, &task_effort_, &nominal_theta_d_dot_,
+          &nominal_theta_dot_, &nominal_theta_, &nominal_friction_, &efforts_}) v->setZero(num_controlled_dofs_);
       return;
     }
 
     bool CompliantController::setJointStiffnessMatrix(
         Eigen::MatrixXd const& joint_stiffness_matrix) {
-      if (!checkMatrix(joint_stiffness_matrix)) {
+      if (!checkMatrix(joint_stiffness_matrix) || !joint_stiffness_matrix.isDiagonal() ||
+          (joint_stiffness_matrix.diagonal().array() <= 0).any()) {
         return false;
       }
       inverse_joint_stiffness_matrix_ = joint_stiffness_matrix.inverse();
@@ -98,7 +100,8 @@ namespace compliant_controllers {
 
     bool CompliantController::setRotorInertiaMatrix(
         Eigen::MatrixXd const& rotor_inertia_matrix) {
-      if (!checkMatrix(rotor_inertia_matrix)) {
+      if (!checkMatrix(rotor_inertia_matrix) || !rotor_inertia_matrix.isDiagonal() ||
+          (rotor_inertia_matrix.diagonal().array() <= 0).any()) {
         return false;
       }
       rotor_inertia_matrix_ = rotor_inertia_matrix;
@@ -131,7 +134,7 @@ namespace compliant_controllers {
     }
 
     bool CompliantController::setTaskKMatrix(Eigen::MatrixXd const& task_k_matrix) {
-      if ((task_k_matrix.rows() != 6) || (task_k_matrix.cols() != 6)) {
+      if (!task_k_matrix.allFinite() || (task_k_matrix.rows() != 6) || (task_k_matrix.cols() != 6)) {
         return false;
       }
       task_k_matrix_ = task_k_matrix;
@@ -140,7 +143,7 @@ namespace compliant_controllers {
 
     bool CompliantController::setTaskDMatrix(Eigen::MatrixXd const& task_d_matrix)
     {
-      if ((task_d_matrix.rows() != 6) || (task_d_matrix.cols() != 6)) {
+      if (!task_d_matrix.allFinite() || (task_d_matrix.rows() != 6) || (task_d_matrix.cols() != 6)) {
         return false;
       }
       task_d_matrix_ = task_d_matrix;
@@ -149,7 +152,6 @@ namespace compliant_controllers {
 
     bool CompliantController::setJointKMatrix(Eigen::MatrixXd const& joint_k_matrix) {
       if (!checkMatrix(joint_k_matrix)) {
-        std::cout << "Failed to set joint k matrix" << std::endl; 
         return false;
       }
       joint_k_matrix_ = joint_k_matrix;
@@ -166,12 +168,14 @@ namespace compliant_controllers {
 
     bool CompliantController::setMaxJointError(Eigen::VectorXd const& joint_error_max)
     {
-      if (!joint_error_max.rows() != num_controlled_dofs_) return false;
+      if (joint_error_max.size() != num_controlled_dofs_ || !joint_error_max.allFinite() ||
+          (joint_error_max.array() < 0).any()) return false;
       q_error_max_ = joint_error_max;
       return true;
     }
 
     bool CompliantController::init() {
+      extended_joints_->reset();
       count_ = 0;
       q_error_.setZero();
       q_error_sum_.setZero();
@@ -180,8 +184,9 @@ namespace compliant_controllers {
 
     void CompliantController::advanceKinematics(Eigen::VectorXd const& q)
     {
-      pinocchio::forwardKinematics(*robot_model_, *data_, joint_ros_to_pinocchio(q, *robot_model_));
-      pinocchio::computeJointJacobians(*robot_model_, *data_, joint_ros_to_pinocchio(q, *robot_model_));
+      joint_ros_to_pinocchio(q, *robot_model_, pinocchio_positions_);
+      pinocchio::forwardKinematics(*robot_model_, *data_, pinocchio_positions_);
+      pinocchio::computeJointJacobians(*robot_model_, *data_, pinocchio_positions_);
       pinocchio::updateFramePlacements(*robot_model_, *data_);
     }
 
@@ -198,8 +203,17 @@ namespace compliant_controllers {
       return tempIsometry3d_;
     }
 
-    Eigen::VectorXd CompliantController::computeEffort(RobotState const& desired_state,
-        RobotState const&  current_state, ros::Duration const& period) {    
+    const Eigen::VectorXd& CompliantController::computeEffort(RobotState const& desired_state,
+        RobotState const&  current_state, double period) {
+      if (!std::isfinite(period) || period <= 0.0)
+        throw std::invalid_argument("period must be finite and positive");
+      for (const auto* state : {&desired_state, &current_state}) {
+        if (state->positions.size() != num_controlled_dofs_ ||
+            state->velocities.size() != num_controlled_dofs_ ||
+            state->efforts.size() != num_controlled_dofs_ ||
+            !state->positions.allFinite() || !state->velocities.allFinite() || !state->efforts.allFinite())
+          throw std::invalid_argument("joint state dimensions/finite values");
+      }
       desired_positions_ = desired_state.positions;
 
       if (!extended_joints_->isInitialized()) {
@@ -215,31 +229,26 @@ namespace compliant_controllers {
       extended_joints_->update(current_state.positions);
       current_theta_ = extended_joints_->getPositions();
 
-      // F2: Pinocchio defence (see docs/diagnosis_report.md C2, F2).
+      // GELLO sends wrapped continuous angles. Lift the reference onto the measured turn;
+      // bounded joints retain their absolute coordinates.
+      for (int i = 0; i < num_controlled_dofs_; ++i) {
+        if (continuous_joints_[i])
+          desired_positions_(i) = current_theta_(i) +
+            std::remainder(desired_positions_(i) - current_theta_(i), 2.0 * M_PI);
+      }
       try {
+        joint_ros_to_pinocchio(current_theta_, *robot_model_, pinocchio_positions_);
         gravity_ = pinocchio::computeGeneralizedGravity(
-            *robot_model_, *data_,
-            joint_ros_to_pinocchio(current_theta_, *robot_model_));
-      } catch (const std::exception& ex) {
+          *robot_model_, *data_, pinocchio_positions_);
+      } catch (...) {
         nan_pinocchio_throws_.fetch_add(1, std::memory_order_relaxed);
-        ROS_ERROR_THROTTLE(
-            1.0,
-            "[compliant_controllers/joint_task_space] Pinocchio "
-            "computeGeneralizedGravity threw: %s — zeroing gravity",
-            ex.what());
-        gravity_ = Eigen::VectorXd::Zero(num_controlled_dofs_);
+        throw;
       }
       if (!gravity_.allFinite()) {
         nan_pinocchio_output_.fetch_add(1, std::memory_order_relaxed);
-        ROS_WARN_THROTTLE(
-            1.0,
-            "[compliant_controllers/joint_task_space] Pinocchio gravity "
-            "non-finite — zeroing affected entries");
-        for (Eigen::Index i = 0; i < gravity_.size(); ++i) {
-          if (!std::isfinite(gravity_[i])) gravity_[i] = 0.0;
-        }
+        throw std::runtime_error("non-finite model gravity");
       }
-    
+
       // DESIRED AND NOMINAL TRANSFORMS FOR ERROR PREDICTION
 
       // Get desired ee position from desired joint states
@@ -268,17 +277,17 @@ namespace compliant_controllers {
       // Taskspace position error
       taskspace_error_.head(3) = nominal_ee_transform_.translation() - desired_ee_transform_.translation(); // positional error
 
-      // Gravity compensation is performed inside the hardware interface
+      // Gravity is added exactly once below when apply_gravity_ is true.
       // The jacobian includes derivatives for the gripper which does not affect the manipulator so these are ignored
       task_effort_.noalias() = jacobian_.block(0, 0, 6, num_controlled_dofs_).transpose() * (-task_k_matrix_ * taskspace_error_
                                                                                             -task_d_matrix_ * jacobian_.block(0, 0, 6, num_controlled_dofs_) * (nominal_theta_dot_prev_ - desired_state.velocities))
                               - joint_k_matrix_*(nominal_theta_prev_ - desired_positions_ - inverse_joint_stiffness_matrix_*gravity_)
                               - joint_d_matrix_*(nominal_theta_dot_prev_ - desired_state.velocities);
 
-      // Time step smaller than period.toSec() potentially because of too small rotor inertia matrix
+      // Preserve the ROS1 nominal integrator at 1 kHz (enforced by the ROS2 wrapper).
       double const step_time {0.001};
-      // Sign of the current state effort seems to be negative of commanded
-      nominal_theta_d_dot_.noalias() = inverse_rotor_inertia_matrix_*(task_effort_ + gravity_ + current_state.efforts);
+      // Exclaim exports ROS-sign torque; the ROS1 backend exposed its negative.
+      nominal_theta_d_dot_.noalias() = inverse_rotor_inertia_matrix_*(task_effort_ + gravity_ - current_state.efforts);
       nominal_theta_dot_ = nominal_theta_dot_prev_ + nominal_theta_d_dot_*step_time;
       nominal_theta_ = nominal_theta_prev_ + nominal_theta_dot_*step_time;
 
@@ -296,18 +305,15 @@ namespace compliant_controllers {
       // F1: Integrator trap-break — see docs/diagnosis_report.md.
       if (!nominal_theta_.allFinite() || !nominal_theta_dot_.allFinite()) {
         nan_integrator_resets_.fetch_add(1, std::memory_order_relaxed);
-        ROS_WARN_THROTTLE(
-            1.0,
-            "[compliant_controllers/joint_task_space] integrator state "
-            "went non-finite — resetting nominal_theta_*_prev_ to current");
         nominal_theta_prev_     = current_theta_;
         nominal_theta_dot_prev_ = current_state.velocities;
-        efforts_.setZero();
+        throw std::runtime_error("nominal integrator became non-finite");
       } else {
         nominal_theta_prev_ = nominal_theta_;
         nominal_theta_dot_prev_ = nominal_theta_dot_;
       }
 
+      if (!efforts_.allFinite()) throw std::runtime_error("non-finite effort command");
       return efforts_;
     }
 
@@ -321,10 +327,6 @@ namespace compliant_controllers {
       // from NaN.  See docs/diagnosis_report.md C3, F3.
       if (!q_error_sum_.allFinite()) {
         nan_q_error_sum_resets_.fetch_add(1, std::memory_order_relaxed);
-        ROS_WARN_THROTTLE(
-            1.0,
-            "[compliant_controllers/joint_task_space] q_error_sum_ went "
-            "non-finite — resetting to zero");
         q_error_sum_.setZero();
       }
 
@@ -344,7 +346,7 @@ namespace compliant_controllers {
     }
 
     bool CompliantController::checkMatrix(Eigen::MatrixXd const& matrix) const noexcept {
-      if ((matrix.rows() != num_controlled_dofs_) || (matrix.cols() != num_controlled_dofs_)) {
+      if (!matrix.allFinite() || (matrix.rows() != num_controlled_dofs_) || (matrix.cols() != num_controlled_dofs_)) {
         return false;
       }
       return true;

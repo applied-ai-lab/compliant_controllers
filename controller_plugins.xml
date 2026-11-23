@@ -1,27 +1,5 @@
-<library path="lib/libjoint_space_compliant_controller">
-    <class name="compliant_controllers/JointSpaceJointTrajectoryController"
-           type="compliant_controllers::joint_space::JointTrajectoryController"
-           base_class_type="controller_interface::ControllerBase">
-      <description>
-        Joint-space compliant controller with gravity compensation
-      </description>
-    </class>
-</library>
-<library path="lib/libjoint_task_space_compliant_controller">
-    <class name="compliant_controllers/JointTaskSpaceJointTrajectoryController"
-           type="compliant_controllers::joint_task_space::JointTrajectoryController"
-           base_class_type="controller_interface::ControllerBase">
-      <description>
-        Joint and task-space compliant controller with gravity compensation
-      </description>
-    </class>
-</library>
-<library path="lib/libtask_space_compliant_controller">
-    <class name="compliant_controllers/TaskSpaceJointTrajectoryController"
-           type="compliant_controllers::task_space::JointTrajectoryController"
-           base_class_type="controller_interface::ControllerBase">
-      <description>
-        Task-space compliant controller with gravity compensation
-      </description>
-    </class>
+<library path="compliant_controller">
+  <class name="compliant_controllers/JointTaskSpaceJointTrajectoryController" type="compliant_controllers::JointTaskSpaceController" base_class_type="controller_interface::ControllerInterface">
+    <description>Combined joint/task-space impedance and nominal-state observer; effort commands in N*m.</description>
+  </class>
 </library>

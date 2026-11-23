@@ -39,6 +39,7 @@ namespace compliant_controllers {
   */
   [[nodiscard]]
   Eigen::VectorXd joint_ros_to_pinocchio(Eigen::VectorXd const& q, pinocchio::Model const& model);
+  void joint_ros_to_pinocchio(Eigen::VectorXd const& q, pinocchio::Model const& model, Eigen::VectorXd& output);
 
 }
 

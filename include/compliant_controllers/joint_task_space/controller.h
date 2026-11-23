@@ -31,7 +31,6 @@
 #include <pinocchio/multibody/fwd.hpp>
 
 #include <Eigen/Eigen>
-#include <ros/ros.h>
 
 #include "compliant_controllers/extended_joint_positions.h"
 #include "compliant_controllers/robot_state.h"
@@ -218,7 +217,9 @@ namespace compliant_controllers {
          *   The effort that should be applied to the individual joints to move to the desired state
         */
         [[nodiscard]]
-        Eigen::VectorXd computeEffort(RobotState const& desired_state, RobotState const& current_state, ros::Duration const& period);
+        // States and commands use ROS joint signs, radians, rad/s and N*m.
+        // The legacy nominal integrator remains fixed at 1 ms; the ROS wrapper requires 1 kHz.
+        const Eigen::VectorXd& computeEffort(RobotState const& desired_state, RobotState const& current_state, double period);
 
         /**\fn integrate_error
          * \brief
@@ -308,6 +309,7 @@ namespace compliant_controllers {
         Eigen::VectorXd q_error_sum_;
         Eigen::VectorXd q_error_max_;
         std::unique_ptr<ExtendedJointPositions> extended_joints_;
+        std::vector<bool> continuous_joints_;
         int count_;
 
         // Task-space deltas
@@ -336,6 +338,7 @@ namespace compliant_controllers {
         Eigen::VectorXd nominal_theta_;
         Eigen::VectorXd nominal_friction_;
         Eigen::VectorXd efforts_;
+        Eigen::VectorXd pinocchio_positions_;
 
         // NaN counters — see docs/diagnosis_report.md F1, F2, F3.
         std::atomic<std::uint64_t> nan_integrator_resets_{0};

@@ -19,6 +19,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <vector>
 
 #include <Eigen/Eigen>
 
@@ -38,7 +39,8 @@ namespace compliant_controllers {
        * \param[in] number_of_dof
        *   Degrees of freedom of all of the joints combined
       */
-      ExtendedJointPositions(unsigned int const number_of_dof);
+      ExtendedJointPositions(unsigned int const number_of_dof, std::vector<bool> continuous = {});
+      void reset() noexcept;
       ExtendedJointPositions() = delete;
       ExtendedJointPositions(ExtendedJointPositions const&) = default;
       ExtendedJointPositions& operator= (ExtendedJointPositions const&) = default;
@@ -77,7 +79,7 @@ namespace compliant_controllers {
        *   The newly computed joint positions
       */
       [[nodiscard]]
-      Eigen::VectorXd getPositions() const noexcept {
+      const Eigen::VectorXd& getPositions() const noexcept {
         return unwrapped_joint_positions_;
       }
 
@@ -136,6 +138,7 @@ namespace compliant_controllers {
 
       bool is_initialized_;
       unsigned int number_of_dof_;
+      std::vector<bool> continuous_;
 
       Eigen::VectorXd unwrapped_joint_positions_;
       Eigen::VectorXd previous_joint_positions_;

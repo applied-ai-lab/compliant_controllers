@@ -50,10 +50,10 @@ namespace compliant_controllers {
        *   The size that the underlying arrays should be resized to
       */
       void resize(int const num_of_dof) {
-        positions.resize(num_of_dof);
-        velocities.resize(num_of_dof);
-        accelerations.resize(num_of_dof);
-        efforts.resize(num_of_dof);
+        positions.setZero(num_of_dof);
+        velocities.setZero(num_of_dof);
+        accelerations.setZero(num_of_dof);
+        efforts.setZero(num_of_dof);
         return;
       }
 

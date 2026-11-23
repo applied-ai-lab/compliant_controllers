@@ -17,22 +17,28 @@
 #include "compliant_controllers/extended_joint_positions.h"
 
 #include <cmath>
+#include <stdexcept>
 
 #include <Eigen/Eigen>
 
 
 namespace compliant_controllers {
 
-  ExtendedJointPositions::ExtendedJointPositions(unsigned int const number_of_dof)
-  : is_initialized_{false}, number_of_dof_{number_of_dof} {
+  ExtendedJointPositions::ExtendedJointPositions(unsigned int const number_of_dof, std::vector<bool> continuous)
+  : is_initialized_{false}, number_of_dof_{number_of_dof}, continuous_{std::move(continuous)} {
+    if (continuous_.empty()) continuous_.assign(number_of_dof_, true);
+    if (continuous_.size() != number_of_dof_) throw std::invalid_argument("continuous joint mask size");
     unwrapped_joint_positions_.resize(number_of_dof_, 1);
     previous_joint_positions_.resize(number_of_dof_, 1);
     return;
   }
 
   bool ExtendedJointPositions::init(Eigen::VectorXd const& initial_joint_positions) {
+    if (initial_joint_positions.size() != number_of_dof_ || !initial_joint_positions.allFinite()) return false;
     if (is_initialized_ == false) {
-      unwrapped_joint_positions_ = normalize(initial_joint_positions);
+      unwrapped_joint_positions_ = initial_joint_positions;
+      for (Eigen::Index i = 0; i < initial_joint_positions.size(); ++i)
+        if (continuous_[i]) unwrapped_joint_positions_(i) = normalize(initial_joint_positions(i));
       previous_joint_positions_ = unwrapped_joint_positions_;
       is_initialized_ = true;
       return true;
@@ -41,6 +47,8 @@ namespace compliant_controllers {
   }
 
   void ExtendedJointPositions::update(Eigen::VectorXd const& measured_joint_positions) {
+    if (!is_initialized_ || measured_joint_positions.size() != number_of_dof_)
+      throw std::invalid_argument("joint positions not initialized or wrong size");
     for (Eigen::Index i = 0; i < measured_joint_positions.size(); ++i) {
       // F4: NaN guard.  A non-finite reading is skipped entirely.  Because
       // previous_joint_positions_ is updated INSIDE the loop (below), the
@@ -57,6 +65,11 @@ namespace compliant_controllers {
       // into [-pi, pi), so a 0/2pi seam crossing is read as the small
       // physical motion it really is, and the result is independent of which
       // 2pi-congruent representative the reading uses.
+      if (!continuous_[i]) {
+        unwrapped_joint_positions_(i) = measured_joint_positions(i);
+        previous_joint_positions_(i) = measured_joint_positions(i);
+        continue;
+      }
       double const delta {normalize(measured_joint_positions(i) - previous_joint_positions_(i))};
       unwrapped_joint_positions_(i) += delta;
       previous_joint_positions_(i) = measured_joint_positions(i);
@@ -71,6 +84,12 @@ namespace compliant_controllers {
       output += 2.0*M_PI;
     }
     return output - M_PI;
+  }
+
+  void ExtendedJointPositions::reset() noexcept {
+    is_initialized_ = false;
+    unwrapped_joint_positions_.setZero();
+    previous_joint_positions_.setZero();
   }
 
   Eigen::VectorXd ExtendedJointPositions::normalize(Eigen::VectorXd const& joint_positions) {

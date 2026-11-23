@@ -1,137 +1,90 @@
-# Compliant controllers
+# Combined compliant controller — ROS2 Jazzy
 
-Authors: [Tobit Flatscher](https://github.com/2b-t), [Alexander Mitchell](https://github.com/mitch722) (2024-25)
+This branch ports FRANK's ROS1 **combined joint/task-space** controller to a native ros2_control
+effort controller. The nominal-state/friction observer, quaternion task error and joint/task
+spring superposition are retained. Only this controller is built; the other ROS1 variants and
+adapters are historical source.
 
+The first hardware target is a seven-axis Gen3 with Tesollo DG4F-M, **Kinova TORQUE mode**, Ubuntu
+24.04 and ROS2 Jazzy. Use the accompanying `ros2_kortex/ros2-compliant`,
+`frank-robot-ros-2/compliant-torque` and `frank_gello/compliant-torque` branches.
+Physical commissioning is still required. Software results and dependency pins are in
+[`docs/validation.md`](docs/validation.md); the hardware procedure is
+[`docs/commissioning.md`](docs/commissioning.md).
 
+## Interface
 
-This package contains a **compliant controller for robotic arms in ROS Noetic** and extends on the [`gen3_compliant_controllers`](https://github.com/empriselab/gen3_compliant_controllers) repository and wraps it as a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller) that performs interpolation in between different set-points. This means that the controller can be used in combination with [MoveIt](https://moveit.ros.org/install/). As a result of wrapping the controller as JointTrajectoryController, this code base has been largely rewritten in comparison to gen3_compliant_controllers.
-Currently this package only supports robotic arms with revolute and no prismatic joints.
+Plugin: `compliant_controllers/JointTaskSpaceJointTrajectoryController`.
+It claims seven `<joint>/effort` commands and position, velocity and effort states. Commands and
+feedback use **ROS joint signs and N·m**. The core subtracts ROS-sign measured effort in the
+observer, replacing the old addition of raw, oppositely signed Kortex feedback.
 
-We include a video of some of the capabilities of the controller below.
+Input: `~/joint_trajectory`, `trajectory_msgs/msg/JointTrajectory`.
+All seven joint names are required; names may be reordered. Positions must be finite and inside
+bounded-joint URDF limits. Optional velocity/acceleration arrays must be complete and finite;
+acceleration requires velocity. Empty, partial, duplicate-name, expired and malformed trajectories
+are rejected, leaving the current reference in place. Feedforward effort input and a
+FollowJointTrajectory action server are outside this GELLO-only port.
 
+Native `frank_gello` stays at its existing **100 Hz**, position-only, **25 ms** horizon. The public
+ROS2 trajectory sampler supplies linear interpolation for these points and quintic interpolation
+when positions, velocities and accelerations are provided. Header stamp zero starts immediately.
+Continuous joints use the nearest physical turn; bounded joints keep absolute coordinates.
 
-https://github.com/user-attachments/assets/e98561c3-c4f2-404f-8530-9cf1f278964a
+Output diagnostics: `~/commanded_effort`, `std_msgs/msg/Float64MultiArray`, at 100 Hz, in configured
+joint order. This is the controller's filtered request **before** the driver's slew/absolute limits;
+it is not a measurement of torque applied by the robot.
 
+## Dynamics and lifecycle
 
+The controller reads the controller manager's robot description. Pinocchio reduces it to the seven
+named arm joints, preserving the tool, mounting transforms and fitted hand inertia. Uncontrolled
+joints are locked at the model's neutral configuration. Tesollo finger posture and estimated
+inertias therefore remain a fixed-payload approximation, as in the old dynamics model.
 
-The video above shows the joint-, task- and joint and task-space control modes. The joint and task-space mode is default. It is possible to vary the gains of the joint and task space controller so that it becomes either a task or joint space controller only using dynamic reconfigure. 
+Gravity is added **once, in the controller**. The driver sends total torque and adds no gravity.
+The observer integration remains fixed at 1 ms; configuration requires a 1 kHz controller rate.
+The old nominal 30 Hz effort-feedback coefficient (two updates per read) and 100 Hz output
+coefficient move from `kortex_hardware` into this wrapper. The output filter now acts on torque,
+before Exclaim's limits. TORQUE firmware dynamics and URDF limits differ from the old CURRENT
+path, so the physical response is not asserted to be identical.
 
-The controller can be used for pin insertion and for replanning in the event of human interaction as is shown in the video below:
+Activation seeds the reference and observer from measured state and clears old trajectories.
+Reactivation after manual repositioning repeats this seeding. Non-finite feedback, model failures
+or non-finite output return a controller error, allowing the manager to deactivate the controller
+and the hardware to restore POSITION hold. Deactivation itself does not pretend that zero torque
+is a physical stop: mode transitions belong to the driver.
 
-https://github.com/user-attachments/assets/611a5bd9-6b1f-4e88-bd31-5ce5a897ff2d
+`config/ros2/commissioning.yaml` is a deliberately lower-stiffness starting profile, not qualified
+hardware tuning. Gain arrays can be changed atomically through ROS2 parameters. Dimensions,
+finite/nonnegative entries and strictly positive rotor inertia/joint stiffness are checked before
+publication to the control thread. The old `setMaxJointError` dimension typo is fixed; integral
+observer gain and its error bound both start at zero to preserve disabled integral action.
 
-The default task and joint-space controller is tuned for both expansive movements as well as fine assembly insertions. We show these behaviours in the video below.
+## Local validation
 
-https://github.com/user-attachments/assets/c386813f-6a8c-42f3-81cf-0325f8897e6d
-
-## Usage
-
-### Running on the hardware
-
-This code must be used in combination with the **`kortex_hardware` hardware interface** (see [here](https://github.com/applied-ai-lab/kortex_hardware) for the installation instructions) as the hardware interface implements torque filtering as well as **gravity compensation**. 
-
-You will have to run the `kortex_hardware` hardware interface as well as this controller. The hardware interface launches in effort mode by default, meaning that the controller can be started.
-
-Proceed to activate the controller by opening the `rqt_controller_manager` GUI, selecting the controller and switching it to `running`:
-
-```bash
-$ rosrun rqt_controller_manager rqt_controller_manager
-```
-
-
-### Running in simulation
-
-This controller does not work well in simulation, even when increasing friction and damping for Gazebo inside the URDF. Probably the reason for this is that the `kortex_hardware` hardware interface implements torque filtering as well as gravity compensation that are both not handled by the simulated hardware interface. It seems to be workable when increasing stiffness of the system by increasing the joint stiffness matrix (e.g. to `8000`), joint compliance proportional gain matrix (e.g. to `100`) as well as the joint compliance derivative gain matrix (e.g. to `10`).
-
-You can test the controllers on a single arm by installing `ros_kortex` (see [here](https://github.com/Kinovarobotics/ros_kortex)) and then **launching the Gazebo simulation**:
-
-```bash
-$ roslaunch kortex_gazebo spawn_kortex_robot.launch
-```
-
-Then **run the `compliant_controller`** making sure it uses the same name space as the robot, by default `my_gen3`,
-
-```bash
-$ roslaunch compliant_controllers joint_space_compliant_controller.launch robot_description_parameter:=/my_gen3/robot_description __ns:=my_gen3
-```
-
-adjust the gains if necessary (as discussed above) and **switch to the compliant controller**:
-
-```bash
-$ rosservice call /my_gen3/controller_manager/switch_controller "start_controllers: ['joint_space_compliant_controller']
-stop_controllers: ['gen3_joint_trajectory_controller']
-strictness: 1
-start_asap: false
-timeout: 0.0"
-```
-
-Finally you can control the arm with the **`rqt_joint_trajectory_controller`** graphic user interface:
-
-```bash
-$ rosrun rqt_joint_trajectory_controller rqt_joint_trajectory_controller __ns:=my_gen3
-```
-
-Choose the corresponding controller manager, select the desired joint trajectory controller and switch it to active. You should now be able to move all joints independently in a smooth manner with the sliders.
-
-
-## Sending Smooth Trajecotories and Replanning
-
-As mentioned, this controller is a compliant controller wrapping a [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller). You can stream a set point message or a **sparse** trajectory, which is a list of set points. When a single set point is sent to the controller, this will be the input to the control algorithm. Alternatively, the controller will interpolate between the current robot motion and the input trajectory. This is explained in more detail in the subsections below.
-
-### Streaming Joint Trajectory Points
-
-Streaming single [`JointTrajectoryPoint`](https://docs.ros.org/en/noetic/api/trajectory_msgs/html/msg/JointTrajectoryPoint.html) at high frequency works well for closed-loop replanning and tele-operation. This is achieved by publishing [`JointTrajectoryPoint`](https://docs.ros.org/en/noetic/api/trajectory_msgs/html/msg/JointTrajectoryPoint.html) to the [`JointTrajectoryController`](http://wiki.ros.org/joint_trajectory_controller) topic.
-
-### Sending Joint Trajectories
-
-Sending a [`trajectory of set points`](https://docs.ros.org/en/noetic/api/trajectory_msgs/html/msg/JointTrajectory.html) to the `JointTrajectoryController's`](http://wiki.ros.org/joint_trajectory_controller) action server, triggers the controller to interpolate between the robot's current motion and the new trajectory. Documentation on replanning with the trajectory follower controller is found [`here`](https://wiki.ros.org/joint_trajectory_controller/UnderstandingTrajectoryReplacement).
-
-The controller interpolates between trajectories using splines of varying order. See the table below for more details:
-
-| Spline Order  | Poses | Velocities | Accelerations | Notes                |
-| ------------- | ----- | ---------- | ------------- | -------------------- |
-| 3             | Yes   | No         | No            | Not recommended      | 
-| 4             | Yes   | Yes        | No            |                      |
-| 5             | Yes   | Yes        | Yes           |                      |   
-
-
-The trajectory follower fits a spline starting at the *current* joint positions, velocities and accelerations and ending at the beginning of a *future* set point. As shown above, smoothest results are achieved when velocities and accelerations are included in the new trajectory. 
-
-Furthermore, do not send a new trajectory with a set point at the current joint state. For example, if you are at timestep t, do not send a pose for this timestep, but send the set point for t + 1 as the initial or only pose. The trajectory follower will interpolate from its own states at t and find a smooth path to the set point at t + 1. See Figure 2 in [`UnderstaningJointTrajectoryReplacement`](https://wiki.ros.org/joint_trajectory_controller/UnderstandingTrajectoryReplacement) for an example of this.
-   
-
-## Code Breakdown
-
-The algorithms and ROS control architecture are written in separate files. The non-ROS parts algorithms are found in
+With sibling checkouts in this repository's parent directory, start the dedicated Docker context
+and build the pinned image:
 
 ```bash
-https://github.com/applied-ai-lab/compliant_controllers/blob/feat/joint-task-combo/include/compliant_controllers/<MODE>/controller.h
-and
-https://github.com/applied-ai-lab/compliant_controllers/blob/feat/joint-task-combo/src/<MODE>/controller.cpp
+docker --context colima-frank-ros2 build --platform linux/amd64 \
+  -t frank-compliant:jazzy -f compliant_controllers/docker/Dockerfile.jazzy compliant_controllers/docker
+docker --context colima-frank-ros2 run --rm --platform linux/amd64 \
+  --mount type=bind,src="$PWD",dst=/repos \
+  --mount type=volume,src=frank-compliant-validation,dst=/ws \
+  frank-compliant:jazzy bash /repos/compliant_controllers/docker/validate.sh
 ```
-where the **MODE** is the controller type e.g. (joint_task_space, joint, task).
 
-## Cite This Controller
-
-We have written a technical report and posted it on [arxiv](https://arxiv.org/abs/2504.21159). Please cite this paper when you use this controller in your publications. 
+Run these from the **parent directory** containing the sibling repositories. The Dockerfile pins
+the ROS base digest and FRANK's 16 November 2026 ROS snapshot. amd64 is emulated on this Mac.
+LTO is disabled for validation because GCC's LTO jobserver crashed under emulation; this does not
+qualify robot-host timing. Regenerating the historical trace is optional:
 
 ```bash
-@misc{mitchell2025taskjointspacedualarm,
-      title={Task and Joint Space Dual-Arm Compliant Control}, 
-      author={Alexander L. Mitchell and Tobit Flatscher and Ingmar Posner},
-      year={2025},
-      eprint={2504.21159},
-      archivePrefix={arXiv},
-      primaryClass={cs.RO},
-      url={https://arxiv.org/abs/2504.21159}, 
-}
+source /opt/ros/jazzy/setup.bash
+python3 /repos/compliant_controllers/test/ros2/generate_legacy_trace.py
 ```
 
-## Known issues
-
-This package has a few limitations mostly stemming from its initial implementation. We will try to resolve these over time.
-
-- The controller **time step** is **hard-coded** into the controller, setting it to an actual realistic time does not seem to work.
-- Running the simulation currently requires modifications to the `ros_controllers` repository to run in **simulation**. A template argument has to be added to the `JointTrajectoryController` with the default value `HardwareInterfaceAdapter` to the `JointTrajectoryController`: `template <class SegmentImpl, class HardwareInterface, template <class HW, class S> class Adapter = HardwareInterfaceAdapter> class JointTrajectoryController` (see [here](https://github.com/ros-controls/ros_controllers/blob/678b92adfd9242c93b78c066a8369c7665ea1421/joint_trajectory_controller/include/joint_trajectory_controller/joint_trajectory_controller.h#L178))  and the joint trajectory controller in this repository has to call this `CompliantHardwareInterface` instead. Otherwise the code will run into a **segmentation fault inside Gazebo**.
-- Currently dynamic reconfigure does not support variable size arrays. For this reason we implemented dynamic reconfigure for a fixed size list of parameters holding sufficient parameters for most traditional robotic arms (7). In case the robot does not have the corresponding joints, the last additional degrees of freedom will not be used.
-
+The trace compiles the original ROS1 source at `e146030dc8e5bb264ccecf8efaedeb80906c10cf`
+independently, with a ROS Duration/logging shim. It tests source equivalence on the same Pinocchio
+version, not equivalence to an unverified deployed ROS1 binary.

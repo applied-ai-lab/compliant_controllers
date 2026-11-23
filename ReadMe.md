@@ -23,8 +23,21 @@ Input: `~/joint_trajectory`, `trajectory_msgs/msg/JointTrajectory`.
 All seven joint names are required; names may be reordered. Positions must be finite and inside
 bounded-joint URDF limits. Optional velocity/acceleration arrays must be complete and finite;
 acceleration requires velocity. Empty, partial, duplicate-name, expired and malformed trajectories
-are rejected, leaving the current reference in place. Feedforward effort input and a
-FollowJointTrajectory action server are outside this GELLO-only port.
+are rejected, leaving the current reference in place. Feedforward effort input is rejected.
+
+`~/follow_joint_trajectory` provides the standard `control_msgs/action/FollowJointTrajectory`
+action for MoveIt. It reports desired/actual/error feedback, completion, cancellation and path/goal
+tolerance failures. Canceled or failed goals hold the measured pose; completed goals hold the final
+reference. New action goals preempt old ones. Topic commands are rejected while an action is active:
+pause GELLO before MoveIt execution and engage it after the action completes. Deactivation/controller
+errors abort outstanding goals; inactive controllers reject goals.
+
+Scalar position/velocity tolerances support 0 (use default) and -1 (disable). Nonzero terminal velocities, positive acceleration
+tolerances, multi-DOF trajectories and component tolerances are rejected because the plugin lacks
+measured acceleration/multi-DOF state. Configuration parameters `action_path_tolerance` (0.5 rad),
+`action_goal_tolerance` (0.03 rad), `action_stopped_velocity_tolerance` (0.05 rad/s) and
+`action_goal_time_tolerance` (2 s) provide commissioning defaults; zero disables a scalar limit.
+These are independent of stiffness gains and need on-robot qualification.
 
 Native `frank_gello` stays at its existing **100 Hz**, position-only, **25 ms** horizon. The public
 ROS2 trajectory sampler supplies linear interpolation for these points and quintic interpolation

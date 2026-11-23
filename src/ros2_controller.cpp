@@ -51,6 +51,10 @@ bool normalizeTrajectory(trajectory_msgs::msg::JointTrajectory& msg,
 
 CallbackReturn JointTaskSpaceController::on_init() {
   auto n = get_node();
+  n->declare_parameter("action_path_tolerance", .5);
+  n->declare_parameter("action_goal_tolerance", .03);
+  n->declare_parameter("action_stopped_velocity_tolerance", .05);
+  n->declare_parameter("action_goal_time_tolerance", 2.0);
   n->declare_parameter("joints", std::vector<std::string>{});
   n->declare_parameter("end_effector_link", std::string{});
   n->declare_parameter("feedback_cutoff_hz", 30.0);
@@ -111,10 +115,16 @@ CallbackReturn JointTaskSpaceController::on_configure(const rclcpp_lifecycle::St
     for (auto* p : {&reference_, &sampled_}) {
       p->positions.resize(7); p->velocities.resize(7); p->accelerations.resize(7);
     }
+    configureAction();
     subscriber_ = get_node()->create_subscription<TrajectoryMsg>("~/joint_trajectory", rclcpp::QoS(1),
       [this](TrajectoryMsg::SharedPtr msg) {
         const auto generation = generation_.load();
         if (!accepting_.load()) return;
+        std::lock_guard<std::mutex> lock(action_mutex_);
+        for (const auto& e : executions_) if (e->terminal.load() == 999) {
+          RCLCPP_WARN(get_node()->get_logger(), "Trajectory topic ignored while an action owns the reference");
+          return;
+        }
         std::string reason;
         if (!normalizeTrajectory(*msg, joints_, arm_.continuous, arm_.lower, arm_.upper, reason)) {
           RCLCPP_WARN(get_node()->get_logger(), "Rejected trajectory: %s", reason.c_str()); return;
@@ -193,7 +203,7 @@ CallbackReturn JointTaskSpaceController::on_activate(const rclcpp_lifecycle::Sta
     for (std::size_t i = 0; i < 7; ++i) reference_.positions[i] = measured_.positions[arm_.indices[i]];
     std::fill(reference_.velocities.begin(), reference_.velocities.end(), 0);
     std::fill(reference_.accelerations.begin(), reference_.accelerations.end(), 0);
-    pending_.writeFromNonRT(Pending{}); active_msg_.reset(); cycles_ = 0;
+    pending_.writeFromNonRT(Pending{}); active_msg_.reset(); active_execution_.reset(); trajectory_running_=false; cycles_ = 0;
     accepting_.store(true); return CallbackReturn::SUCCESS;
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_node()->get_logger(), "Activate failed: %s", e.what()); return CallbackReturn::ERROR;
@@ -202,6 +212,7 @@ CallbackReturn JointTaskSpaceController::on_activate(const rclcpp_lifecycle::Sta
 CallbackReturn JointTaskSpaceController::on_deactivate(const rclcpp_lifecycle::State&) {
   accepting_.store(false);
   ++generation_;
+  if (active_execution_) { int expected=999; active_execution_->terminal.compare_exchange_strong(expected, Follow::Result::INVALID_GOAL); }
   // Physical stop/hold belongs to the hardware's effort -> POSITION mode switch.
   return CallbackReturn::SUCCESS;
 }
@@ -215,9 +226,15 @@ controller_interface::return_type JointTaskSpaceController::update(const rclcpp:
     if (msg && msg != active_msg_) {
       trajectory_->update(msg);
       trajectory_->set_point_before_trajectory_msg(time, reference_, arm_.continuous);
-      active_msg_ = msg;
+      active_msg_ = msg; trajectory_running_=true;
+      active_execution_ = pending.execution;
+      if (active_execution_) {
+        auto start = rclcpp::Time(msg->header.stamp, time.get_clock_type());
+        if (start.nanoseconds()==0) start=time;
+        active_execution_->end=start+rclcpp::Duration(msg->points.back().time_from_start);
+      }
     }
-    if (active_msg_) {
+    if (active_msg_ && trajectory_running_) {
       joint_trajectory_controller::TrajectoryPointConstIter begin, end;
       if (trajectory_->sample(time, joint_trajectory_controller::interpolation_methods::InterpolationMethod::VARIABLE_DEGREE_SPLINE,
                               sampled_, begin, end)) {
@@ -225,6 +242,7 @@ controller_interface::return_type JointTaskSpaceController::update(const rclcpp:
         reference_ = sampled_;
       }
     }
+    monitorAction(time);
     for (std::size_t i = 0; i < 7; ++i) {
       desired_.positions[arm_.indices[i]] = reference_.positions[i];
       desired_.velocities[arm_.indices[i]] = reference_.velocities[i];
@@ -245,6 +263,7 @@ controller_interface::return_type JointTaskSpaceController::update(const rclcpp:
     return controller_interface::return_type::OK;
   } catch (const std::exception& e) {
     accepting_.store(false);
+    if (active_execution_) { int expected=999; active_execution_->terminal.compare_exchange_strong(expected, Follow::Result::INVALID_GOAL); }
     RCLCPP_ERROR(get_node()->get_logger(), "Update failed; requesting hardware hold: %s", e.what());
     return controller_interface::return_type::ERROR;
   }

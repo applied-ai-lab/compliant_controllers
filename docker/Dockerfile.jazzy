@@ -16,6 +16,8 @@ RUN apt-get purge -y ros2-apt-source \
     ros-jazzy-ros2-controllers-test-nodes libyaml-cpp-dev \
     ros-jazzy-proxsuite ros-jazzy-moveit-core ros-jazzy-tf2-eigen \
     ros-jazzy-dynamixel-sdk pybind11-dev python3-serial \
+    ros-jazzy-moveit-ros-move-group ros-jazzy-moveit-simple-controller-manager \
+    ros-jazzy-moveit-kinematics ros-jazzy-moveit-planners-ompl ros-jazzy-pilz-industrial-motion-planner \
  && rm -rf /var/lib/apt/lists/*
 ENV ROS_DOMAIN_ID=83 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
 WORKDIR /ws

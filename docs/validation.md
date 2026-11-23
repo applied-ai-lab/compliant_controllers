@@ -89,3 +89,20 @@ GCC's LTO jobserver failed under amd64 emulation when building the existing nati
 module. Disabling interprocedural optimization resolved that build failure; the validation recipe
 records the flag. The VM cannot establish a 1 kHz real-time deadline. On-robot acceptance and
 measured timing belong to the control NUC procedure in `commissioning.md`.
+
+## FollowJointTrajectory / MoveIt workflow follow-up
+
+The restored action server was tested with real ROS action clients against the loaded compliant
+effort plugin: completion/feedback, malformed goal rejection, reordered joint names, cancellation,
+action preemption, path/goal tolerance aborts, topic ownership and controller deactivation. A real
+`move_group` process in `mode:=compliant` successfully executed a zero-motion trajectory through
+the compliant action while the position controller was inactive. This proves execution routing;
+the effort mock does not simulate physical tracking, and the test does not collision-check a
+calibration movement. Existing controller, arm bringup, MoveIt configuration, GELLO delivery and
+two-manager tests passed. Both hand configurations preserve non-arm MoveIt controller entries.
+
+The trial operator Procman config uses a shared `arm_mode` option (default `position`) for the
+arm launch, MoveIt execution and GELLO routing. Its configuration parses with the native Procman
+parser. Selecting `compliant` loads the arm compliant controllers inactive; activation remains
+explicit. The validation Docker recipe includes the MoveIt runtime/controller-manager plugins
+needed for the execution test.

@@ -143,3 +143,21 @@ agreement, holding and tracking, contact/release behaviour, controller switching
 and release, manual reposition/reactivation, communication fault recovery and restart. Software
 tests cannot qualify these SDK/firmware/mechanical behaviours. Keep the ROS1 path available for
 comparison until these checks pass.
+
+## MoveIt to GELLO calibration
+
+After the first supported torque/hold checks, activate both arm compliant controllers before a
+both-arm calibration plan. Keep GELLO paused. Start a single MoveIt process with:
+
+```bash
+ros2 launch frank_moveit_config move_group.launch.py ee:=tesollo_dg4f mode:=compliant
+```
+
+In the operator trial Procman configuration, select `arm_mode=compliant` before starting arms,
+MoveIt and GELLO; their routes then agree. The compliant controllers still start inactive. In RViz,
+plan and execute the `gello_calibration` named pose through the compliant action servers. Confirm
+a successful action result and quiet hold, then calibrate/align GELLO and explicitly engage.
+Small MoveIt trajectories and GELLO now share the compliant controller; POSITION-first remains
+an initial commissioning check. Topic targets cannot override an active action. Cancellation, path
+tolerance failure and expired goal tolerance request measured-pose hold. Verify stop/release and
+controller reactivation independently on the hardware.

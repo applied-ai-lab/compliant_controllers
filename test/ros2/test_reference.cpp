@@ -3,6 +3,7 @@
 #include <limits>
 #include <controller_interface/controller_interface_params.hpp>
 #include "compliant_controllers/ros2_controller.hpp"
+#include "compliant_controllers/gravity_monitor.hpp"
 using namespace compliant_controllers;
 using Msg=trajectory_msgs::msg::JointTrajectory;
 std::vector<std::string> names() {
@@ -92,4 +93,39 @@ TEST_F(Lifecycle, ClaimsEffortRejectsBadRateAndReseedsOnReactivation) {
   ASSERT_EQ(bad.init(p),controller_interface::return_type::OK);
   bad.get_node()->set_parameters({rclcpp::Parameter("joints",names()),rclcpp::Parameter("end_effector_link",std::string("right_kinova_arm_tool_frame"))});
   EXPECT_EQ(bad.on_configure({}),controller_interface::CallbackReturn::ERROR);
+}
+
+TEST_F(Lifecycle, GravityMonitorNeedsNoCommandsAndInvalidFeedbackStaysDiagnostic) {
+  std::ifstream file(std::string(TEST_SOURCE_DIR)+"/urdf/oxf20_right_arm.urdf");
+  const std::string xml{std::istreambuf_iterator<char>(file),{}};
+  GravityMonitor c;
+  controller_interface::ControllerInterfaceParams p;
+  p.controller_name="test_gravity_monitor";p.robot_description=xml;p.update_rate=100;p.controller_manager_update_rate=1000;
+  ASSERT_EQ(c.init(p),controller_interface::return_type::OK);
+  auto ordered=names();std::reverse(ordered.begin(),ordered.end());
+  c.get_node()->set_parameters({rclcpp::Parameter("joints",ordered),rclcpp::Parameter("end_effector_link",std::string("right_kinova_arm_tool_frame"))});
+  ASSERT_EQ(c.on_configure({}),controller_interface::CallbackReturn::SUCCESS);
+  EXPECT_EQ(c.command_interface_configuration().type,controller_interface::interface_configuration_type::NONE);
+  EXPECT_TRUE(c.command_interface_configuration().names.empty());
+  EXPECT_EQ(c.state_interface_configuration().names.size(),21u);
+  std::array<std::array<double,3>,7> feedback{};
+  std::vector<hardware_interface::StateInterface::SharedPtr> states;
+  std::vector<hardware_interface::LoanedStateInterface> loaned;
+  for (int i=0;i<7;++i) for(int k=2;k>=0;--k) {
+    states.push_back(std::make_shared<hardware_interface::StateInterface>(names()[i],std::array<std::string,3>{"position","velocity","effort"}[k],&feedback[i][k]));
+    loaned.emplace_back(states.back());
+  }
+  c.assign_interfaces({},std::move(loaned));
+  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  const auto now=rclcpp::Time(1000000000LL);
+  EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(.01)),controller_interface::return_type::OK);
+  feedback[3][2]=NAN;
+  EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(.01)),controller_interface::return_type::OK);
+  c.on_deactivate({});
+  EXPECT_EQ(c.on_activate({}),controller_interface::CallbackReturn::ERROR);
+  feedback[3][2]=0;
+  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(0)),controller_interface::return_type::OK);
+  EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(.01)),controller_interface::return_type::OK);
+  c.on_deactivate({});c.release_interfaces();
 }

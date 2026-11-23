@@ -101,3 +101,29 @@ python3 /repos/compliant_controllers/test/ros2/generate_legacy_trace.py
 The trace compiles the original ROS1 source at `e146030dc8e5bb264ccecf8efaedeb80906c10cf`
 independently, with a ROS Duration/logging shim. It tests source equivalence on the same Pinocchio
 version, not equivalence to an unverified deployed ROS1 binary.
+
+## Read-only gravity monitor
+
+`compliant_controllers/GravityMonitor` can run alongside a POSITION controller in the same arm
+manager. It claims **no command interfaces** and shares position/velocity/effort states. It uses
+the same model reduction and `computeGravity` function as the compliant control law. The companion
+`frank_kortex` launch loads it into existing managers:
+
+```bash
+ros2 launch frank_kortex gravity_monitor.launch.py sides:=left
+```
+
+`/<side>_arm_gravity_monitor/comparison` (`control_msgs/JointTrajectoryControllerState`, 100 Hz)
+contains model gravity in `reference.effort`, measured torque in `feedback.effort`, and their
+difference (model minus measured) in `error.effort`. Joint names/order and measured positions and
+velocities accompany each sample. `output` is empty. `/valid` and `/quasi_static` Boolean topics
+at 10 Hz indicate finite calculations and a reported-velocity-based settling check. Invalid
+samples are skipped without returning a controller error to the motion manager. Stopping the
+launch unloads the monitor, leaving motion-controller ownership intact.
+
+The monitor reads the selected manager's full description and locks non-arm joints at neutral,
+including fingers, preserving the mounted payload. Compare at rest, without extra contact or
+objects: measured torques also include dynamic/friction/closed-loop effects. This diagnostic
+computes the gravity component only; it does not simulate the complete friction observer or
+qualify hardware torque-command signs and closed-loop behaviour. Timing on the real NUC remains
+part of commissioning.

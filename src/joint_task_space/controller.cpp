@@ -237,9 +237,7 @@ namespace compliant_controllers {
             std::remainder(desired_positions_(i) - current_theta_(i), 2.0 * M_PI);
       }
       try {
-        joint_ros_to_pinocchio(current_theta_, *robot_model_, pinocchio_positions_);
-        gravity_ = pinocchio::computeGeneralizedGravity(
-          *robot_model_, *data_, pinocchio_positions_);
+        gravity_ = computeGravity(current_theta_, *robot_model_, *data_, pinocchio_positions_);
       } catch (...) {
         nan_pinocchio_throws_.fetch_add(1, std::memory_order_relaxed);
         throw;

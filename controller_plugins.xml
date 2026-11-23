@@ -2,4 +2,7 @@
   <class name="compliant_controllers/JointTaskSpaceJointTrajectoryController" type="compliant_controllers::JointTaskSpaceController" base_class_type="controller_interface::ControllerInterface">
     <description>Combined joint/task-space impedance and nominal-state observer; effort commands in N*m.</description>
   </class>
+  <class name="compliant_controllers/GravityMonitor" type="compliant_controllers::GravityMonitor" base_class_type="controller_interface::ControllerInterface">
+    <description>Read-only model gravity versus measured effort; claims no command interfaces.</description>
+  </class>
 </library>

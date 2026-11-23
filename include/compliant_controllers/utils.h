@@ -39,6 +39,8 @@ namespace compliant_controllers {
   */
   [[nodiscard]]
   Eigen::VectorXd joint_ros_to_pinocchio(Eigen::VectorXd const& q, pinocchio::Model const& model);
+  const Eigen::VectorXd& computeGravity(Eigen::VectorXd const& q, pinocchio::Model const& model,
+                                       pinocchio::Data& data, Eigen::VectorXd& q_pin);
   void joint_ros_to_pinocchio(Eigen::VectorXd const& q, pinocchio::Model const& model, Eigen::VectorXd& output);
 
 }

@@ -106,3 +106,14 @@ arm launch, MoveIt execution and GELLO routing. Its configuration parses with th
 parser. Selecting `compliant` loads the arm compliant controllers inactive; activation remains
 explicit. The validation Docker recipe includes the MoveIt runtime/controller-manager plugins
 needed for the execution test.
+
+## Read-only gravity monitor follow-up
+
+The monitor was loaded into both existing arm managers alongside active POSITION trajectory
+controllers for Tesollo and Robotiq mock models. Tests verified zero claimed command interfaces,
+retained POSITION ownership, successful rigid motion during monitoring, numerical agreement with
+an independent full-model gravity calculation at sampled poses, and successful rigid motion after
+monitor unloading. The shared gravity function remains covered by the original numerical trace.
+A lifecycle test supplies only state interfaces in a reordered layout and checks invalid samples
+remain diagnostic-only. Model comparison does not claim physical dynamics/torque-sign validation.
+The temporary Procman menu includes loading, plots, settled-sample indicators and recording.

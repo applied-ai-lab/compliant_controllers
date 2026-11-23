@@ -18,13 +18,14 @@ find_package(pinocchio REQUIRED)
 add_library(compliant_core SHARED src/joint_task_space/controller.cpp src/extended_joint_positions.cpp src/utils.cpp src/model.cpp)
 target_include_directories(compliant_core PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 target_link_libraries(compliant_core PUBLIC Eigen3::Eigen pinocchio::pinocchio)
-add_library(compliant_controller SHARED src/ros2_controller.cpp src/trajectory_action.cpp)
+add_library(compliant_controller SHARED src/ros2_controller.cpp src/trajectory_action.cpp src/gravity_monitor.cpp)
 target_link_libraries(compliant_controller compliant_core)
 ament_target_dependencies(compliant_controller controller_interface hardware_interface joint_trajectory_controller pluginlib rclcpp rclcpp_action control_msgs realtime_tools std_msgs trajectory_msgs)
 pluginlib_export_plugin_description_file(controller_interface controller_plugins.xml)
 install(TARGETS compliant_core compliant_controller EXPORT export_compliant_controllers LIBRARY DESTINATION lib ARCHIVE DESTINATION lib RUNTIME DESTINATION bin)
 install(FILES include/compliant_controllers/robot_state.h include/compliant_controllers/utils.h
   include/compliant_controllers/extended_joint_positions.h include/compliant_controllers/model.hpp
+  include/compliant_controllers/gravity_monitor.hpp
   include/compliant_controllers/ros2_controller.hpp DESTINATION include/compliant_controllers)
 install(FILES include/compliant_controllers/joint_task_space/controller.h DESTINATION include/compliant_controllers/joint_task_space)
 install(DIRECTORY config/ros2 DESTINATION share/${PROJECT_NAME}/config)

@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <pinocchio/algorithm/rnea.hpp>
 
 // Pinocchio has to be included before ROS
 // See https://github.com/wxmerkt/pinocchio_ros_example
@@ -24,6 +25,12 @@
 
 
 namespace compliant_controllers {
+  const Eigen::VectorXd& computeGravity(Eigen::VectorXd const& q, pinocchio::Model const& model,
+      pinocchio::Data& data, Eigen::VectorXd& q_pin) {
+    joint_ros_to_pinocchio(q, model, q_pin);
+    return pinocchio::computeGeneralizedGravity(model, data, q_pin);
+  }
+
 
   Eigen::VectorXd joint_ros_to_pinocchio(Eigen::VectorXd const& q, pinocchio::Model const& model) {
     Eigen::VectorXd q_pin {model.nq};

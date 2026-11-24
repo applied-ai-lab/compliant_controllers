@@ -117,3 +117,22 @@ monitor unloading. The shared gravity function remains covered by the original n
 A lifecycle test supplies only state interfaces in a reordered layout and checks invalid samples
 remain diagnostic-only. Model comparison does not claim physical dynamics/torque-sign validation.
 The temporary Procman menu includes loading, plots, settled-sample indicators and recording.
+
+## Fault-recovery follow-up — 24 November 2026
+
+The driver now latches faults observed during torque control, including base fault/servoing-ready
+states and either actuator fault bank. Externally clearing a fault cannot resume old effort
+commands. Recovery verifies POSITION and seeds the measured pose before sending another cyclic
+frame; an explicit successful full-arm POSITION controller switch is required before torque can
+be activated again. Explicit fault reset and soft-stop release preserve that latch. Failed
+restoration requests an emergency stop and reports an error.
+
+Jazzy/Ubuntu 24.04 amd64 Docker build and driver tests passed: **21 effort/recovery GTests**
+(the existing five plus 16 new cases) and **14 existing soft-stop GTests**. Colcon reports
+37 passing entries including the two CTest wrappers, with no failures or skips. The recovery
+tests exercise production read/write, mode prepare/perform, torque entry/exit and command building
+with simulated SDK operations. They cover external clear with stale commands and a changed pose,
+all live fault sources, explicit POSITION/restart, late faults, failed mode/frame restoration,
+fault reset and soft-stop interaction. They also verify POSITION faults do not acquire a torque
+latch. No physical SDK/firmware or timing qualification is implied; the supported-arm recovery
+checks in `commissioning.md` still require the robot.

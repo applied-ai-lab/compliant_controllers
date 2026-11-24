@@ -113,6 +113,16 @@ ros2 control switch_controllers -c /left_arm_controller_manager --strict \
   --deactivate left_arm_controller --activate left_arm_compliant_controller
 ```
 
+A fault observed during torque control also latches recovery. Clearing the fault through the
+pendant, another client or `reset_fault` does not resume effort commands. Once the fault has
+cleared, the driver suspends low-level servoing, verifies POSITION mode and seeds a hold at the
+measured pose before sending another cyclic command. It does not clear a detected fault by
+itself. Use the two explicit switches above after clearing the fault; a direct torque restart
+is refused until the full arm has successfully switched to POSITION. In the trial Procman group,
+these are `02 hold/return selected to POSITION` and `02 hold/activate selected compliance`.
+A failed restoration requests an emergency stop and returns an error; inspect the log before
+retrying. Verify external fault clearing and the two-switch recovery with the arm supported.
+
 For pendant/manual guiding, pause GELLO, deactivate the arm controller, then deactivate the hardware
 component. The driver returns actuators to POSITION and the base to SINGLE_LEVEL_SERVOING, keeping
 the API connection available for reactivation:

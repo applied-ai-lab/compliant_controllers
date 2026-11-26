@@ -75,6 +75,17 @@ finite/nonnegative entries and strictly positive rotor inertia/joint stiffness a
 publication to the control thread. The old `setMaxJointError` dimension typo is fixed; integral
 observer gain and its error bound both start at zero to preserve disabled integral action.
 
+`joint_stiffness` is the model's assumed torsional stiffness of each joint/transmission
+(N·m/rad). The controller uses `gravity / joint_stiffness` as a nominal-angle correction for
+elastic deflection under load. It is a model parameter; use `joint_k` and `joint_d` to tune
+holding stiffness and damping. For example, 5 N·m with a modeled stiffness of 3500 N·m/rad
+corresponds to about 0.0014 rad (0.08°) of deflection correction.
+
+The `frank_kortex` commissioning helper also provides the original ROS1 Procman `soft`,
+`default` and `stiff` presets. They update only `joint_k`, `joint_d`, `task_k` and `task_d`;
+`joint_stiffness`, inertia and observer gains are preserved. All preset commands send live
+parameter updates without switching controllers, pausing GELLO or changing reference targets.
+
 ## Local validation
 
 With sibling checkouts in this repository's parent directory, start the dedicated Docker context

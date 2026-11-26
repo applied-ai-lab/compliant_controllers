@@ -9,6 +9,7 @@ RUN apt-get purge -y ros2-apt-source \
     ros-jazzy-controller-manager ros-jazzy-controller-interface ros-jazzy-hardware-interface ros-jazzy-ros2controlcli \
     ros-jazzy-joint-trajectory-controller ros-jazzy-joint-state-broadcaster \
     ros-jazzy-velocity-controllers ros-jazzy-pinocchio ros-jazzy-realtime-tools \
+    ros-jazzy-parallel-gripper-controller ros-jazzy-python-qt-binding python3-pyqt5.qtsvg \
     ros-jazzy-ament-cmake-gtest ros-jazzy-ament-cmake-pytest ros-jazzy-xacro \
     ros-jazzy-robot-state-publisher ros-jazzy-ros2-control-test-assets \
     ros-jazzy-flir-ptu-description ros-jazzy-realsense2-description \

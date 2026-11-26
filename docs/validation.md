@@ -136,3 +136,32 @@ all live fault sources, explicit POSITION/restart, late faults, failed mode/fram
 fault reset and soft-stop interaction. They also verify POSITION faults do not acquire a torque
 latch. No physical SDK/firmware or timing qualification is implied; the supported-arm recovery
 checks in `commissioning.md` still require the robot.
+
+## Main integration — 26 November 2026
+
+Merged the current main branches into the testing branches, using `origin/frank` from
+`applied-ai-lab/ros2_kortex` for the driver. The controller's `ros2` branch also includes the
+merged soft-stop observer-reset work. Robot launch/documentation conflicts and the operator
+Procman conflicts were resolved, retaining main's numbered groups, Tesollo default, startup
+items, hand model/controller updates and optional arm-watchdog default (off, 1.0 s timeout).
+Successful soft-stop recovery now automatically resumes the active controller; independent
+torque faults retain explicit POSITION recovery. GELLO keeps main's 50 Hz / 50 ms defaults.
+
+All 13 selected packages built in the Jazzy amd64 container, including the new Tesollo
+feedforward controller. Controller/driver, model/state-publisher, IK, arm integration and
+Tesollo tests passed. The final colcon report contains 151 passing entries including CTest
+wrappers (the focused GELLO-delivery rerun replaces its package's multi-test wrapper report).
+The delivery test now checks the configured horizon rather than assuming the old 25 ms value.
+Procman's 80 commands parsed; all command predicates resolved, embedded shell syntax passed,
+and ONE-OFF/startup exclusions remained reciprocal.
+
+Separately, 56 GELLO unit/GUI checks passed. Four extended full-robot GELLO mock cases initially
+failed to start because the cached container lacked `parallel_gripper_controller`; after
+installing it, that extended suite still had failures. Further investigation was deferred at
+the user's request. The focused native GELLO-to-compliant-controller integration test passed.
+The validation image recipe now includes the missing mock-lift and Qt dependencies.
+
+Uncommitted hand-startup work was saved separately on the robot repository's
+`wip/tesollo-startup-activation` branch (`aa3df62`); it is excluded from this integration.
+Main's temporary lift software-stop bypass is retained as requested; the team uses the
+physical hard stop during migration. Physical commissioning remains required.

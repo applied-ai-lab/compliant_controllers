@@ -1,12 +1,16 @@
-# Tesollo / TORQUE commissioning — 24 November 2026
+# Tesollo / TORQUE commissioning — 26 November 2026
 
 This is a runnable first-trial path, with physical commissioning still pending. Start one arm;
 repeat on the other before running both. Use the robot's existing emergency-stop facilities and
-the native FRANK soft-stop bridge. The existing soft-stop watchdog remains enabled.
+the native FRANK soft-stop bridge. The arm driver's optional ROS-topic watchdog follows the
+current robot launch default: off; enable it with `soft_stop_watchdog:=true` (1.0 s timeout).
+The USB button heartbeat option in Procman is separate.
 
 ## Prepare the workspaces
 
-Apply the tested source snapshots/bundles described in `deployment/README.md`. On the control NUC,
+Use the current testing branches through the operator Procman `compliant testing/00 ONE-OFF setup`
+items: `compliant_controllers/ros2`, `applied-ai-lab/ros2_kortex/ros2-compliant`, and
+`compliant-torque` in the robot, GELLO and machine workspace repositories. On the control NUC,
 build `kortex_api`, `kortex_description`, `kortex_driver`, `compliant_controllers`, `frank_description`,
 `frank_moveit_config` and `frank_kortex`. On the operator PC, build `frank_gello`; the rest of the
 native GELLO/model stack should already be installed from the new ROS2 repositories.
@@ -102,9 +106,11 @@ ros2 param set /left_arm_compliant_controller task_k '[100.0,100.0,100.0,10.0,10
 ## Stop, manual reposition and resume
 
 GELLO **Pause** stops new references; the compliant controller keeps holding its last reference.
-The physical soft stop belongs to the driver. After soft-stop release the driver restores
-POSITION hold and ignores ongoing effort commands until the controller is explicitly reactivated.
-Pause GELLO, then use two switches to reset the controller:
+The physical soft stop belongs to the driver. Successful soft-stop recovery automatically restores
+the active controller's mode and resumes its latest target, including targets received during
+the stop. The compliant observer and filters reset from measured feedback. Pause GELLO before
+release if you want tracking paused. An independent torque fault still requires explicit recovery:
+pause GELLO, clear the fault, then use these two switches to reset the controller:
 
 ```bash
 ros2 control switch_controllers -c /left_arm_controller_manager --strict \

@@ -13,11 +13,12 @@ cd /ws
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 colcon build --packages-select kortex_api kortex_driver kortex_description compliant_controllers \
   robotiq_description frank_description frank_moveit_config frank_kortex frank_interface frank_ik frank_gello \
+  frank_tesollo frank_tesollo_controllers \
   --executor sequential --cmake-args -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF
 source /ws/install/setup.bash
 colcon test --packages-select compliant_controllers kortex_driver frank_description frank_kortex frank_ik \
-  --event-handlers console_direct+
+  frank_tesollo frank_tesollo_controllers --executor sequential --event-handlers console_direct+
 colcon test-result --all --verbose
 python3 -m pytest -q /repos/frank_gello/test/test_calibration.py /repos/frank_gello/test/test_lowpass.py \
   /repos/frank_gello/test/test_driver.py /repos/frank_gello/test/test_safety.py /repos/frank_gello/test/test_grippers.py

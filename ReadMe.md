@@ -39,7 +39,8 @@ measured acceleration/multi-DOF state. Configuration parameters `action_path_tol
 `action_goal_time_tolerance` (2 s) provide commissioning defaults; zero disables a scalar limit.
 These are independent of stiffness gains and need on-robot qualification.
 
-Native `frank_gello` stays at its existing **100 Hz**, position-only, **25 ms** horizon. The public
+Native `frank_gello` follows its current configuration: **50 Hz**, position-only, **50 ms** horizon
+with the merged main defaults. The public
 ROS2 trajectory sampler supplies linear interpolation for these points and quintic interpolation
 when positions, velocities and accelerations are provided. Header stamp zero starts immediately.
 Continuous joints use the nearest physical turn; bounded joints keep absolute coordinates.

@@ -51,6 +51,7 @@ bool normalizeTrajectory(trajectory_msgs::msg::JointTrajectory& msg,
 
 CallbackReturn JointTaskSpaceController::on_init() {
   auto n = get_node();
+  n->declare_parameter("soft_stop_state_prefix", std::string{});
   n->declare_parameter("action_path_tolerance", .5);
   n->declare_parameter("action_goal_tolerance", .03);
   n->declare_parameter("action_stopped_velocity_tolerance", .05);
@@ -96,6 +97,7 @@ void JointTaskSpaceController::applyGains(const Gains& g) {
 CallbackReturn JointTaskSpaceController::on_configure(const rclcpp_lifecycle::State&) {
   try {
     parameter_callback_.reset();
+    soft_stop_state_prefix_ = get_node()->get_parameter("soft_stop_state_prefix").as_string();
     if (get_update_rate() != 1000) throw std::invalid_argument("legacy observer requires update_rate: 1000");
     joints_ = get_node()->get_parameter("joints").as_string_array();
     const auto tool = get_node()->get_parameter("end_effector_link").as_string();
@@ -170,8 +172,15 @@ controller_interface::InterfaceConfiguration JointTaskSpaceController::command_i
 controller_interface::InterfaceConfiguration JointTaskSpaceController::state_interface_configuration() const {
   controller_interface::InterfaceConfiguration c{controller_interface::interface_configuration_type::INDIVIDUAL, {}};
   for (const auto& j : joints_) for (const auto* s : {"position", "velocity", "effort"}) c.names.push_back(j + "/" + s);
+  if (!soft_stop_state_prefix_.empty()) c.names.push_back(soft_stop_state_prefix_ + "/holding");
   return c;
 }
+bool JointTaskSpaceController::softStopHolding() const {
+  if (soft_stop_state_prefix_.empty()) return false;
+  const double state = state_interfaces_[soft_stop_state_index_].get_optional().value_or(NAN);
+  return !std::isfinite(state) || state != 0.0;
+}
+
 bool JointTaskSpaceController::readState() {
   for (std::size_t i = 0; i < 7; ++i) {
     const auto j = arm_.indices[i];
@@ -196,6 +205,13 @@ CallbackReturn JointTaskSpaceController::on_activate(const rclcpp_lifecycle::Sta
       if (it == command_interfaces_.end()) throw std::runtime_error("missing effort command");
       command_indices_[i] = std::distance(command_interfaces_.begin(), it);
     }
+    if (!soft_stop_state_prefix_.empty()) {
+      const auto name = soft_stop_state_prefix_ + "/holding";
+      auto state = std::find_if(state_interfaces_.begin(), state_interfaces_.end(),
+        [&](const auto& interface) { return interface.get_name() == name; });
+      if (state == state_interfaces_.end()) throw std::runtime_error("missing state: " + name);
+      soft_stop_state_index_ = std::distance(state_interfaces_.begin(), state);
+    }
     if (!readState()) throw std::runtime_error("non-finite activation feedback");
     (void)core_->init();
     desired_ = measured_; desired_.velocities.setZero(); desired_.efforts.setZero();
@@ -204,7 +220,8 @@ CallbackReturn JointTaskSpaceController::on_activate(const rclcpp_lifecycle::Sta
     std::fill(reference_.velocities.begin(), reference_.velocities.end(), 0);
     std::fill(reference_.accelerations.begin(), reference_.accelerations.end(), 0);
     pending_.writeFromNonRT(Pending{}); active_msg_.reset(); active_execution_.reset(); trajectory_running_=false; cycles_ = 0;
-    accepting_.store(true); return CallbackReturn::SUCCESS;
+    motion_paused_ = softStopHolding();
+    accepting_.store(!motion_paused_); return CallbackReturn::SUCCESS;
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_node()->get_logger(), "Activate failed: %s", e.what()); return CallbackReturn::ERROR;
   }
@@ -219,6 +236,20 @@ CallbackReturn JointTaskSpaceController::on_deactivate(const rclcpp_lifecycle::S
 controller_interface::return_type JointTaskSpaceController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {
   try {
     if (!readState()) throw std::runtime_error("non-finite hardware feedback");
+    if (softStopHolding() || motion_paused_) {
+      if (accepting_.exchange(false)) ++generation_;
+      motion_paused_ = true;
+      holdMeasuredReference();
+      active_msg_.reset();
+      if (active_execution_) {
+        int expected = 999;
+        active_execution_->terminal.compare_exchange_strong(expected, Follow::Result::INVALID_GOAL);
+        active_execution_.reset();
+      }
+      // The driver owns the powered POSITION hold. Reactivation resets the observer
+      // and reference at the measured pose before torque commands are accepted again.
+      return controller_interface::return_type::OK;
+    }
     auto gains = *gains_buffer_.readFromRT();
     if (gains != applied_gains_) { applyGains(*gains); applied_gains_ = gains; }
     const auto pending = *pending_.readFromRT();

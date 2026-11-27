@@ -56,7 +56,6 @@ CallbackReturn JointTaskSpaceController::on_init() {
   n->declare_parameter("action_stopped_velocity_tolerance", .05);
   n->declare_parameter("action_goal_time_tolerance", 2.0);
   n->declare_parameter("joints", std::vector<std::string>{});
-  n->declare_parameter("soft_stop_state_prefix", std::string{});
   n->declare_parameter("end_effector_link", std::string{});
   n->declare_parameter("feedback_cutoff_hz", 30.0);
   n->declare_parameter("feedback_filter_passes", 2); // ROS1 performed two updates per read
@@ -99,7 +98,6 @@ CallbackReturn JointTaskSpaceController::on_configure(const rclcpp_lifecycle::St
     parameter_callback_.reset();
     if (get_update_rate() != 1000) throw std::invalid_argument("legacy observer requires update_rate: 1000");
     joints_ = get_node()->get_parameter("joints").as_string_array();
-    soft_stop_state_prefix_ = get_node()->get_parameter("soft_stop_state_prefix").as_string();
     const auto tool = get_node()->get_parameter("end_effector_link").as_string();
     arm_ = reduceToArm(get_robot_description(), joints_, tool);
     core_ = std::make_unique<joint_task_space::CompliantController>(std::move(arm_.model), tool, 7, true);
@@ -172,10 +170,6 @@ controller_interface::InterfaceConfiguration JointTaskSpaceController::command_i
 controller_interface::InterfaceConfiguration JointTaskSpaceController::state_interface_configuration() const {
   controller_interface::InterfaceConfiguration c{controller_interface::interface_configuration_type::INDIVIDUAL, {}};
   for (const auto& j : joints_) for (const auto* s : {"position", "velocity", "effort"}) c.names.push_back(j + "/" + s);
-  if (!soft_stop_state_prefix_.empty()) {
-    c.names.push_back(soft_stop_state_prefix_ + "/active");
-    c.names.push_back(soft_stop_state_prefix_ + "/resume_generation");
-  }
   return c;
 }
 bool JointTaskSpaceController::readState() {
@@ -203,21 +197,6 @@ CallbackReturn JointTaskSpaceController::on_activate(const rclcpp_lifecycle::Sta
       command_indices_[i] = std::distance(command_interfaces_.begin(), it);
     }
     if (!readState()) throw std::runtime_error("non-finite activation feedback");
-    if (!soft_stop_state_prefix_.empty()) {
-      const auto index = [&](const char* suffix) {
-        const auto name = soft_stop_state_prefix_ + "/" + suffix;
-        auto it = std::find_if(state_interfaces_.begin(), state_interfaces_.end(), [&](auto& s){return s.get_name() == name;});
-        if (it == state_interfaces_.end()) throw std::runtime_error("missing state: " + name);
-        return static_cast<std::size_t>(std::distance(state_interfaces_.begin(), it));
-      };
-      soft_stop_active_index_ = index("active");
-      soft_stop_generation_index_ = index("resume_generation");
-      soft_stop_generation_ = state_interfaces_[soft_stop_generation_index_].get_optional().value_or(NAN);
-      const double active = state_interfaces_[soft_stop_active_index_].get_optional().value_or(NAN);
-      if (!std::isfinite(soft_stop_generation_) || !std::isfinite(active))
-        throw std::runtime_error("invalid soft-stop activation state");
-      soft_stopped_ = active != 0;
-    }
     (void)core_->init();
     desired_ = measured_; desired_.velocities.setZero(); desired_.efforts.setZero();
     feedback_filter_ = measured_.efforts; output_started_ = false;
@@ -240,16 +219,6 @@ CallbackReturn JointTaskSpaceController::on_deactivate(const rclcpp_lifecycle::S
 controller_interface::return_type JointTaskSpaceController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {
   try {
     if (!readState()) throw std::runtime_error("non-finite hardware feedback");
-    bool stopped = false, resumed = false;
-    if (!soft_stop_state_prefix_.empty()) {
-      const double active = state_interfaces_[soft_stop_active_index_].get_optional().value_or(NAN);
-      const double generation = state_interfaces_[soft_stop_generation_index_].get_optional().value_or(NAN);
-      if (!std::isfinite(active) || !std::isfinite(generation)) throw std::runtime_error("invalid soft-stop state");
-      stopped = active != 0;
-      resumed = !stopped && (soft_stopped_ || generation != soft_stop_generation_);
-      soft_stopped_ = stopped;
-      soft_stop_generation_ = generation;
-    }
     auto gains = *gains_buffer_.readFromRT();
     if (gains != applied_gains_) { applyGains(*gains); applied_gains_ = gains; }
     const auto pending = *pending_.readFromRT();
@@ -278,21 +247,6 @@ controller_interface::return_type JointTaskSpaceController::update(const rclcpp:
       desired_.positions[arm_.indices[i]] = reference_.positions[i];
       desired_.velocities[arm_.indices[i]] = reference_.velocities[i];
       desired_.accelerations[arm_.indices[i]] = reference_.accelerations[i];
-    }
-    // Keep receiving/sampling targets while stopped, but never integrate an observer against
-    // motion the hardware cannot execute. The driver's recovery generation also catches a
-    // stop/release that happened entirely between two controller updates.
-    if (stopped || resumed) {
-      (void)core_->init();
-      feedback_filter_ = measured_.efforts;
-      output_filter_ = measured_.efforts;
-      output_started_ = true;
-    }
-    if (stopped) {
-      for (std::size_t i = 0; i < 7; ++i)
-        if (!command_interfaces_[command_indices_[i]].set_value(measured_.efforts[arm_.indices[i]]))
-          throw std::runtime_error("effort interface unavailable");
-      return controller_interface::return_type::OK;
     }
     for (int pass = 0; pass < feedback_passes_; ++pass) feedback_filter_ += feedback_alpha_ * (measured_.efforts - feedback_filter_);
     measured_.efforts = feedback_filter_;

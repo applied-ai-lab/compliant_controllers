@@ -27,7 +27,6 @@ public:
   controller_interface::InterfaceConfiguration state_interface_configuration() const override;
   controller_interface::return_type update(const rclcpp::Time&, const rclcpp::Duration&) override;
 private:
-  friend class JointTaskSpaceControllerTestAccess;
   using Follow = control_msgs::action::FollowJointTrajectory;
   using GoalHandle = rclcpp_action::ServerGoalHandle<Follow>;
   struct Execution {
@@ -62,10 +61,6 @@ private:
   RobotState measured_{7}, desired_{7};
   std::array<std::array<std::size_t, 3>, 7> state_indices_{};
   std::array<std::size_t, 7> command_indices_{};
-  std::string soft_stop_state_prefix_;
-  std::size_t soft_stop_active_index_{0}, soft_stop_generation_index_{0};
-  double soft_stop_generation_{0};
-  bool soft_stopped_{false};
   Eigen::VectorXd feedback_filter_{Eigen::VectorXd::Zero(7)}, output_filter_{Eigen::VectorXd::Zero(7)};
   bool output_started_{false};
   bool trajectory_running_{false};

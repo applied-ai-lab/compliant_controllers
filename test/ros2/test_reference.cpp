@@ -129,3 +129,72 @@ TEST_F(Lifecycle, GravityMonitorNeedsNoCommandsAndInvalidFeedbackStaysDiagnostic
   EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(.01)),controller_interface::return_type::OK);
   c.on_deactivate({});c.release_interfaces();
 }
+
+TEST_F(Lifecycle, PoweredHoldPausesUntilReactivationAndDiscardsOldReference) {
+  std::ifstream file(std::string(TEST_SOURCE_DIR)+"/urdf/oxf20_right_arm.urdf");
+  const std::string xml{std::istreambuf_iterator<char>(file),{}};
+  JointTaskSpaceController c;
+  controller_interface::ControllerInterfaceParams p;
+  p.controller_name="powered_hold";p.robot_description=xml;p.update_rate=1000;p.controller_manager_update_rate=1000;
+  ASSERT_EQ(c.init(p),controller_interface::return_type::OK);
+  c.get_node()->set_parameters({rclcpp::Parameter("joints",names()),
+    rclcpp::Parameter("end_effector_link",std::string("right_kinova_arm_tool_frame")),
+    rclcpp::Parameter("soft_stop_state_prefix",std::string("soft_stop"))});
+  ASSERT_EQ(c.on_configure({}),controller_interface::CallbackReturn::SUCCESS);
+  EXPECT_EQ(c.state_interface_configuration().names.size(),22u);
+  double holding=0;
+  std::array<std::array<double,3>,7> feedback{};
+  std::array<double,7> output{};
+  std::vector<hardware_interface::StateInterface::SharedPtr> states;
+  std::vector<hardware_interface::CommandInterface::SharedPtr> commands;
+  std::vector<hardware_interface::LoanedStateInterface> ls;
+  std::vector<hardware_interface::LoanedCommandInterface> lc;
+  for(int i=0;i<7;++i) {
+    for(int k=0;k<3;++k) {
+      states.push_back(std::make_shared<hardware_interface::StateInterface>(names()[i],
+        std::array<std::string,3>{"position","velocity","effort"}[k],&feedback[i][k]));
+      ls.emplace_back(states.back());
+    }
+    commands.push_back(std::make_shared<hardware_interface::CommandInterface>(names()[i],"effort",&output[i]));
+    lc.emplace_back(commands.back(),nullptr);
+  }
+  states.push_back(std::make_shared<hardware_interface::StateInterface>("soft_stop","holding",&holding));
+  ls.emplace_back(states.back());
+  c.assign_interfaces(std::move(lc),std::move(ls));
+  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  const auto period=rclcpp::Duration::from_seconds(.001);
+  ASSERT_EQ(c.update(rclcpp::Time(1000000000LL),period),controller_interface::return_type::OK);
+  const auto previous=output;
+  using Follow = control_msgs::action::FollowJointTrajectory;
+  auto client = rclcpp_action::create_client<Follow>(c.get_node(), "~/follow_joint_trajectory");
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(c.get_node()->get_node_base_interface());
+  ASSERT_TRUE(client->wait_for_action_server(std::chrono::seconds(2)));
+  Follow::Goal goal;goal.trajectory=message();
+  auto send_goal = [&]() {
+    auto future = client->async_send_goal(goal);
+    EXPECT_EQ(executor.spin_until_future_complete(future, std::chrono::seconds(2)),
+      rclcpp::FutureReturnCode::SUCCESS);
+    return future.get();
+  };
+  auto active_goal=send_goal();
+  ASSERT_NE(active_goal,nullptr);
+  auto result=client->async_get_result(active_goal);
+  holding=1;feedback[1][0]=.5;
+  ASSERT_EQ(c.update(rclcpp::Time(1001000000LL),period),controller_interface::return_type::OK);
+  EXPECT_EQ(output,previous);
+  ASSERT_EQ(executor.spin_until_future_complete(result, std::chrono::seconds(2)),
+    rclcpp::FutureReturnCode::SUCCESS);
+  EXPECT_EQ(result.get().code,rclcpp_action::ResultCode::ABORTED);
+  EXPECT_EQ(send_goal(),nullptr);
+  holding=0;feedback[1][0]=.7;
+  ASSERT_EQ(c.update(rclcpp::Time(1002000000LL),period),controller_interface::return_type::OK);
+  EXPECT_EQ(output,previous);
+  EXPECT_EQ(send_goal(),nullptr);
+  c.on_deactivate({});
+  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.update(rclcpp::Time(1003000000LL),period),controller_interface::return_type::OK);
+  EXPECT_NE(output,previous);
+  for(double value:output) EXPECT_TRUE(std::isfinite(value));
+  c.on_deactivate({});c.release_interfaces();
+}

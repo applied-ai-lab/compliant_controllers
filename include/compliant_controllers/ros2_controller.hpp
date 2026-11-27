@@ -55,6 +55,10 @@ private:
   std::shared_ptr<Gains> readGains();
   void applyGains(const Gains&);
   bool readState();
+  bool softStopHolding() const;
+  std::string soft_stop_state_prefix_;
+  std::size_t soft_stop_state_index_{0};
+  bool motion_paused_{false};
   std::vector<std::string> joints_;
   ArmModel arm_;
   std::unique_ptr<joint_task_space::CompliantController> core_;

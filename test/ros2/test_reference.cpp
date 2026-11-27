@@ -61,7 +61,7 @@ TEST_F(Lifecycle, ClaimsEffortRejectsBadRateAndReseedsOnReactivation) {
   p.controller_name="test_compliant";p.robot_description=xml;p.update_rate=1000;p.controller_manager_update_rate=1000;
   ASSERT_EQ(c.init(p),controller_interface::return_type::OK);
   c.get_node()->set_parameters({rclcpp::Parameter("joints",names()),rclcpp::Parameter("end_effector_link",std::string("right_kinova_arm_tool_frame"))});
-  ASSERT_EQ(c.on_configure({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.on_configure(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   EXPECT_EQ(c.command_interface_configuration().names.size(),7u);
   EXPECT_EQ(c.state_interface_configuration().names.size(),21u);
   std::array<std::array<double,3>,7> feedback{};std::array<double,7> output{};
@@ -77,22 +77,22 @@ TEST_F(Lifecycle, ClaimsEffortRejectsBadRateAndReseedsOnReactivation) {
     commands.push_back(std::make_shared<hardware_interface::CommandInterface>(names()[i],"effort",&output[i]));lc.emplace_back(commands.back(),nullptr);
   }
   c.assign_interfaces(std::move(lc),std::move(ls));
-  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.on_activate(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   EXPECT_EQ(c.update(rclcpp::Time(1000000000LL),rclcpp::Duration::from_seconds(.001)),controller_interface::return_type::OK);
   for(double x:output)EXPECT_TRUE(std::isfinite(x));
   feedback[0][0]=NAN;
   EXPECT_EQ(c.update(rclcpp::Time(1001000000LL),rclcpp::Duration::from_seconds(.001)),controller_interface::return_type::ERROR);
-  c.on_deactivate({});feedback[0][0]=.7;
-  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  c.on_deactivate(rclcpp_lifecycle::State{});feedback[0][0]=.7;
+  ASSERT_EQ(c.on_activate(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   EXPECT_EQ(c.update(rclcpp::Time(2000000000LL),rclcpp::Duration::from_seconds(.001)),controller_interface::return_type::OK);
   auto result=c.get_node()->set_parameters_atomically({rclcpp::Parameter("rotor_inertia",std::vector<double>(7,0))});
   EXPECT_FALSE(result.successful);
   EXPECT_TRUE(c.get_node()->set_parameters_atomically({rclcpp::Parameter("task_k",std::vector<double>(6,20))}).successful);
-  c.on_deactivate({});c.release_interfaces();
+  c.on_deactivate(rclcpp_lifecycle::State{});c.release_interfaces();
   JointTaskSpaceController bad;p.controller_name="wrong_rate";p.update_rate=500;
   ASSERT_EQ(bad.init(p),controller_interface::return_type::OK);
   bad.get_node()->set_parameters({rclcpp::Parameter("joints",names()),rclcpp::Parameter("end_effector_link",std::string("right_kinova_arm_tool_frame"))});
-  EXPECT_EQ(bad.on_configure({}),controller_interface::CallbackReturn::ERROR);
+  EXPECT_EQ(bad.on_configure(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::ERROR);
 }
 
 TEST_F(Lifecycle, GravityMonitorNeedsNoCommandsAndInvalidFeedbackStaysDiagnostic) {
@@ -104,7 +104,7 @@ TEST_F(Lifecycle, GravityMonitorNeedsNoCommandsAndInvalidFeedbackStaysDiagnostic
   ASSERT_EQ(c.init(p),controller_interface::return_type::OK);
   auto ordered=names();std::reverse(ordered.begin(),ordered.end());
   c.get_node()->set_parameters({rclcpp::Parameter("joints",ordered),rclcpp::Parameter("end_effector_link",std::string("right_kinova_arm_tool_frame"))});
-  ASSERT_EQ(c.on_configure({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.on_configure(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   EXPECT_EQ(c.command_interface_configuration().type,controller_interface::interface_configuration_type::NONE);
   EXPECT_TRUE(c.command_interface_configuration().names.empty());
   EXPECT_EQ(c.state_interface_configuration().names.size(),21u);
@@ -116,18 +116,18 @@ TEST_F(Lifecycle, GravityMonitorNeedsNoCommandsAndInvalidFeedbackStaysDiagnostic
     loaned.emplace_back(states.back());
   }
   c.assign_interfaces({},std::move(loaned));
-  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.on_activate(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   const auto now=rclcpp::Time(1000000000LL);
   EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(.01)),controller_interface::return_type::OK);
   feedback[3][2]=NAN;
   EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(.01)),controller_interface::return_type::OK);
-  c.on_deactivate({});
-  EXPECT_EQ(c.on_activate({}),controller_interface::CallbackReturn::ERROR);
+  c.on_deactivate(rclcpp_lifecycle::State{});
+  EXPECT_EQ(c.on_activate(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::ERROR);
   feedback[3][2]=0;
-  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.on_activate(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(0)),controller_interface::return_type::OK);
   EXPECT_EQ(c.update(now,rclcpp::Duration::from_seconds(.01)),controller_interface::return_type::OK);
-  c.on_deactivate({});c.release_interfaces();
+  c.on_deactivate(rclcpp_lifecycle::State{});c.release_interfaces();
 }
 
 TEST_F(Lifecycle, PoweredHoldPausesUntilReactivationAndDiscardsOldReference) {
@@ -140,7 +140,7 @@ TEST_F(Lifecycle, PoweredHoldPausesUntilReactivationAndDiscardsOldReference) {
   c.get_node()->set_parameters({rclcpp::Parameter("joints",names()),
     rclcpp::Parameter("end_effector_link",std::string("right_kinova_arm_tool_frame")),
     rclcpp::Parameter("soft_stop_state_prefix",std::string("soft_stop"))});
-  ASSERT_EQ(c.on_configure({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.on_configure(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   EXPECT_EQ(c.state_interface_configuration().names.size(),22u);
   double holding=0;
   std::array<std::array<double,3>,7> feedback{};
@@ -161,7 +161,7 @@ TEST_F(Lifecycle, PoweredHoldPausesUntilReactivationAndDiscardsOldReference) {
   states.push_back(std::make_shared<hardware_interface::StateInterface>("soft_stop","holding",&holding));
   ls.emplace_back(states.back());
   c.assign_interfaces(std::move(lc),std::move(ls));
-  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  ASSERT_EQ(c.on_activate(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   const auto period=rclcpp::Duration::from_seconds(.001);
   ASSERT_EQ(c.update(rclcpp::Time(1000000000LL),period),controller_interface::return_type::OK);
   const auto previous=output;
@@ -191,10 +191,10 @@ TEST_F(Lifecycle, PoweredHoldPausesUntilReactivationAndDiscardsOldReference) {
   ASSERT_EQ(c.update(rclcpp::Time(1002000000LL),period),controller_interface::return_type::OK);
   EXPECT_EQ(output,previous);
   EXPECT_EQ(send_goal(),nullptr);
-  c.on_deactivate({});
-  ASSERT_EQ(c.on_activate({}),controller_interface::CallbackReturn::SUCCESS);
+  c.on_deactivate(rclcpp_lifecycle::State{});
+  ASSERT_EQ(c.on_activate(rclcpp_lifecycle::State{}),controller_interface::CallbackReturn::SUCCESS);
   ASSERT_EQ(c.update(rclcpp::Time(1003000000LL),period),controller_interface::return_type::OK);
   EXPECT_NE(output,previous);
   for(double value:output) EXPECT_TRUE(std::isfinite(value));
-  c.on_deactivate({});c.release_interfaces();
+  c.on_deactivate(rclcpp_lifecycle::State{});c.release_interfaces();
 }

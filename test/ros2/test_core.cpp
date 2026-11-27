@@ -55,7 +55,7 @@ TEST(Core, GravityAddedExactlyOnceWithRosSignFeedback) {
 TEST(Core, ReactivationReseedsAllNominalAndUnwrappedState) {
   auto used=core(), fresh=core(); RobotState q(7), d(7);
   q.positions.setConstant(.4); d.positions.setConstant(.5);
-  for(int i=0;i<100;++i) used->computeEffort(d,q,.001);
+  for(int i=0;i<100;++i) (void)used->computeEffort(d,q,.001);
   ASSERT_TRUE(used->init());
   q.positions.setConstant(1.1); d.positions=q.positions;
   EXPECT_TRUE(used->computeEffort(d,q,.001).isApprox(fresh->computeEffort(d,q,.001),1e-12));
@@ -63,7 +63,7 @@ TEST(Core, ReactivationReseedsAllNominalAndUnwrappedState) {
 TEST(Core, ContinuousReferenceSeamUsesNearestPhysicalTurn) {
   auto a=core(), b=core(); RobotState q(7), d(7);
   q.positions[0]=3.13; d.positions=q.positions;
-  a->computeEffort(d,q,.001); b->computeEffort(d,q,.001);
+  (void)a->computeEffort(d,q,.001); (void)b->computeEffort(d,q,.001);
   d.positions[0]=-3.13;
   const auto torque=a->computeEffort(d,q,.001);
   d.positions[0]+=2*M_PI;
@@ -76,9 +76,9 @@ TEST(Core, RejectsInvalidStateAndSingularInertia) {
   EXPECT_TRUE(c->setMaxJointError(Eigen::VectorXd::Constant(7,.5)));
   EXPECT_FALSE(c->setMaxJointError(Eigen::VectorXd::Zero(6)));
   q.efforts[0]=std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(c->computeEffort(d,q,.001),std::invalid_argument);
+  EXPECT_THROW((void)c->computeEffort(d,q,.001),std::invalid_argument);
   q.efforts.setZero(); q.positions.resize(6);
-  EXPECT_THROW(c->computeEffort(d,q,.001),std::invalid_argument);
+  EXPECT_THROW((void)c->computeEffort(d,q,.001),std::invalid_argument);
 }
 TEST(Model, MapsConfiguredJointOrderAndRejectsMissingJoints) {
   auto n=names(); std::reverse(n.begin(),n.end());
